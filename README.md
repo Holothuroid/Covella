@@ -20,6 +20,12 @@ We first need a smallest time unit, called a `Tick`. Customarily, the JVM uses m
     
 The method `countFromZero` makes sure that you can have 0 milliseconds in a date.
 
+When you create your own units, I recommend including the singular form as a redirect. It will greatly increase readability further on. So...
+
+    def milli = millis
+
+Throughout this tutorial, I assume that both singular und plural are available.
+
 ### Using Cycles for regular time units
 We can know build upon that. 
 
@@ -53,10 +59,10 @@ Now we can turn it into a calendar.
 
     val simpleCalendar = Calendar(standardYear)
     
-That will work, but now all years are the same. First we need a leap year. We can construct it like our standard year but with a different feburary.
+That will work, but now all years are the same. To amend our first attempt, we first need a leap year. We can construct it like the standard year but with a different feburary.
 
-    val leapFebruary = day(29) as month named "February" aka "short"->"Feb"
-    val leapyear = january + leapFebruary + march + april + may + june + july + 
+    val leapFebruary = days(29) as month named "February" aka "short"->"Feb"
+    val leapYear = january + leapFebruary + march + april + may + june + july + 
                         august + september + october + november + december as year
                         
  Then we need a way to define our leap rule or "intercalation", if you feel fancy.
@@ -83,11 +89,12 @@ To enter a Datum, you can use the following syntax.
 You can create key-value pairs of time units and some index, separated by `>` and connect them with the `&` operator.
 
 We can convert between Datum and Timestamp by calling  
-`Datum::timestamp(implicit cal: Calendar)` and  
-`Timestamp::datum(implicit cal: Calendar)`,  
+- `Datum::begins(implicit cal: Calendar)`
+- `Datum::ends(implicit cal: Calendar)` and  
+- `Timestamp::datum(implicit cal: Calendar)`,  
 respectively.
 
-But in order to do so our Calendar requires information about what Datum corresponds to Timestamp(0). Let's put that in.
+But in order to do so our Calendar requires information about what Datum corresponds to `Timestamp(0)`. Let's put that in.
 
     julianCalendar setTimestampZero myDatum
     
@@ -123,4 +130,11 @@ To parse a date, use `.toDatum` and `.toTimestamp`. These are extension methods 
 
 If you want to convert between calendars give them appropriate `timeStampZero` values and use `Timestamp::format(cal: Calendar)` with explicit calendar argument.
    
+### More fun with dates
+Above, you already read how to create a Datum, e.g. `year>1983 & month>12 & day>2`. But how to say "day of week"? Or "week of year"? Easy.
 
+    val unconventionalDate = year>1983 & week/year>2 & day/week>1
+ 
+The `/` can be read as "of". If you are not into squiggly signs or if you are on Java, you can also use "week of year is 2". The unit after the `/` is called the _context_. If you do not provide contexts explicitely, standard contexts will be infered depending on the way you set up your calendar. For example, since days appeared first as parts of months in our Julian Calendar, the standard context of day is month.
+
+Note that you do not have to provide a full list of time units in a Datum. But you should provide a chain beginning with your largest unit, if you want to convert into Timestamp. You check the quality of your input by calling `Datum::check(implicit cal: Calendar)`. This will result in a subtype of `CalendricDate` that provides detailed information at type level.
