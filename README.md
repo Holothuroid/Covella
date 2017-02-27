@@ -63,7 +63,7 @@ That will work, but now all years are the same. First we need a leap year. We ca
  
      val julianEra = Era given _.divisibleBy(4) have leapYear rest standardYear
      
-An Era instance works like partial function. You can add a condition with `given` followed by `have` and the thing you want. You can add any number of such pairs. Once you are done, use `rest` to set a default. It also happens that there is no year 0. 1 BCE is followed by 1 CE. So we exclude 0 from our Era. (That also works on any other `imeUnitInstance with Parenting`.)
+An Era instance works like partial function. You can add a condition with `given` followed by `have` and the thing you want. You can add any number of such pairs. Once you are done, use `rest` to set a default. It also happens that there is no year 0. 1 BCE is followed by 1 CE. So we exclude 0 from our Era. (That also works on any other `TimeUnitInstance with Parenting`.)
 
     julianEra exclude 0
 
@@ -74,7 +74,7 @@ We now have, what we call the Julian Calendar.
 If you want to implement the Gregorian Calendar feel free to do so or look in the standards package.
 
 ### Datum and Timestamp
-Covella features two primary classes for dates. `Datum` which resembles what we humans usually do and `Timestamp` which is a very long number and the format prefered by computers.
+Covella features two primary classes for dates. `Datum` which resembles what we humans usually do, and `Timestamp` which is a very long number and the format prefered by computers.
 
 To enter a Datum, you can use the following syntax.
 
@@ -92,3 +92,35 @@ But in order to do so our Calendar requires information about what Datum corresp
     julianCalendar setTimestampZero myDatum
     
 Using January 1st, 1970 happens to be the unix epoch. If you do not specify, our calendar would assume January 1, 1 CE.
+
+### Secondary Cycles
+We still lack weeks in our model. Weeks form a cycle, independent of months and years. Let's create it.
+
+    val weeks = Cycle from days("Monday","Tuesday","Wednesday","Thursday","Friday",Saturday","Sunday") 
+                    named "week"
+                  
+Now let's add it to our Calendar. January 1st, 1970 happens to be a Thursday, the fourth day of the week.
+
+    julianCalendar synchronize (weeks,4)
+    
+If you want another synchronisation point, you can use `calendar at ... synchronize ...`.
+
+### Date formats
+
+Our calendar is now complete and we are able to create dates. But we also want to output dates as strings or parse strings into dates. This can be done with the DateFormat class.
+
+    val internationalFormat = df"${num(year)}-{num(month)(2)}-{num(day)(2)}"
+    
+This provides DateFormat complete with formatter and parsers. The standard package features convenience methods, so you can write: `df"$y-$m-$d"`
+
+We can now add our format to the calendar.
+
+    julianCalendar addFormat "international"->internationalFormat
+    
+We can now call `.format("international")` to format the date, assuming the calendar is in implicit scope.
+
+To parse a date, use `.toDatum` and `.toTimestamp`. These are extension methods on strings found in covella.Preamble.
+
+If you want to convert between calendars give them appropriate `timeStampZero` values and use `Timestamp::format(cal: Calendar)` with explicit calendar argument.
+   
+
