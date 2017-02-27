@@ -9,4 +9,38 @@ This package provides a DSL for arbitrary systems of time keeping.
 
 - Yet to come: Perform complex queries on your calendar.
 
+## How to
+The following is a presentation of the Western Calendar, that monstrous thing you probably use every day.
 
+We first need a smallest time unit, called a `Tick`. Customarily, the JVM uses milliseconds, so let's do that too.
+
+    val millis = Tick("milliseconds")
+    
+We can know build upon that. 
+
+    val second = Cycle from millis(1000) named "seconds"
+    val minutes = Cycle from seconds(60) named "minutes"
+    val hours = Cycle from minutes(60) named "hours"
+    val days = Cycle from hours(24) named "days"
+    
+These are days, like most people understand them, i.e. no leap seconds. Above the day are the months and years, which happen to be irregular. We first create time units for them.
+
+    val months = TimeUnit named "months"
+    val years = TimeUnit namd "years"
+    
+We then have to define all twelve months, but I'll leave February to December for you.
+
+    val january = days(31) as month named "January" aka "short" -> "Jan"
+    ...
+    
+We first take 31 days, then assign the unit, then a name and an alias. You can add as many aliases as you like with a key value pair. (The method `named X` is short for `aka "default" -> X`.)
+
+We can then add our twelve months and designate them as a year.
+
+    val standardYear = january + february + march + april + may + june + july + august + september + october + november + december as year.
+    
+Now we can turn it into a calendar. 
+
+    val simpleCalendar = Calendar(standardYear)
+    
+That will work, but now all years are the same. We need something more...
