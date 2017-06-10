@@ -13,128 +13,89 @@ This package provides a DSL for arbitrary systems of time keeping.
 
 ### Starting with a tick
 The following is a presentation of the Western Calendar, that monstrous thing you probably use every day.
-
 We first need a smallest time unit, called a `Tick`. Customarily, the JVM uses milliseconds, so let's do that too.
 
-    val millis = Tick("milliseconds") countFromZero
-    
-The method `countFromZero` makes sure that you can have 0 milliseconds in a date.
+    val millis = Tick('millisecond) 
 
-When you create your own units, I recommend including the singular form as a redirect. It will greatly increase readability further on. So...
-
-    def milli = millis
-
-Throughout this tutorial, I assume that both singular und plural are available.
-
-### Using Cycles for regular time units
+### Using Measures for regular time units
 We can know build upon that. 
 
-    val second = Cycle from millis(1000) named "seconds" countFromZero
-    val minutes = Cycle from seconds(60) named "minutes" countFromZero
-    val hours = Cycle from minutes(60) named "hours" countFromZero
-    val days = Cycle from hours(24) named "days"
+    val millis = Tick('millisecond)
+    val seconds = 'second is (millis,1000)
+    val minutes = 'minute is (seconds,1000)
+    val hours = 'hour is (minutes,60)
+    val days = 'day is (hours,24)
 
-We do not want to count days from zero. The first day is day 1.
 
-### Irregular time units
-These are days, like most people understand them, i.e. no leap seconds. Above the day are the months and years, which happen to be irregular. We first create time units for them.
+### Getting irregular with Cycles
+Years and months can be created in one go.
 
-    val months = TimeUnit named "months"
-    val years = TimeUnit namd "years"
-    
-We then have to define all twelve months, but I'll leave February to December for you.
+    val standardYear = 'year isCycleOf 'month madeFrom days comprising
+    ((31, "January"),
+    (28, "February"),
+    (31, "March"),
+    (30, "April"),
+    (31, "May"),
+    (30, "June"),
+    (31, "July"),
+    (31, "August"),
+    (30, "September"),
+    (31, "October"),
+    (30, "November"),
+    (31, "December"))
 
-    val january = days(31) as month named "January" aka "short" -> "Jan"
-    ...
-    
-We first take 31 days, then assign the unit, then a name and an alias. You can add as many aliases as you like with a key value pair. (The method `named X` is short for `aka "default" -> X`.)
-
-We can then add our twelve months and designate them as a year.
-
-    val standardYear = january + february + march + april + may + june + july + 
-                        august + september + october + november + december as year
 
 ### Calendars and Eras
 Now we can turn it into a calendar. 
 
     val simpleCalendar = Calendar(standardYear)
     
-That will work, but now all years are the same. To amend our first attempt, we first need a leap year. We can construct it like the standard year but with a different feburary.
-
-    val leapFebruary = days(29) as month named "February" aka "short"->"Feb"
-    val leapYear = january + leapFebruary + march + april + may + june + july + 
-                        august + september + october + november + december as year
-                        
- Then we need a way to define our leap rule or "intercalation", if you feel fancy.
+That will work, but now all years are the same. To amend our first attempt, we first need a `leapYear`. We can construct it like the standard year but with a different Feburary. Then we need a way to define our leap rule or "intercalation", if you feel fancy.
  
-     val julianEra = Era given _.divisibleBy(4) have leapYear rest standardYear
+     val moreAdvancedEra = Era given divisibleBy(4) have leapYear default standardYear
      
-An Era instance works like partial function. You can add a condition with `given` followed by `have` and the thing you want. You can add any number of such pairs. Once you are done, use `rest` to set a default. It also happens that there is no year 0. 1 BCE is followed by 1 CE. So we exclude 0 from our Era. (That also works on any other `TimeUnitInstance with Parenting`.)
+An Era instance works like partial function. You can add a condition with `given` followed by `have` and the `Measurable` you want. You can add any number of such pairs. Once you are done, you may use `default` to set a default. Then put into a Calendar.
 
-    julianEra exclude 0
+     val moreAdvancedCalendar = Calendar(moreAdvancedEra)
 
-We now have, what we call the Julian Calendar.
-
-     val julianCalendar= Calendar(julianEra)
-
-If you want to implement the Gregorian Calendar feel free to do so or look in the standards package.
+Note that this is not really the calendar we use. The leap rule is more complicated, there is no year 0, and things are really weird in 1582. If you want to savor the thing, find `WesternCalendar` in the examples package.
 
 ### Datum and Timestamp
-Covella features two primary classes for dates. `Datum` which resembles what we humans usually do, and `Timestamp` which is a very long number and the format prefered by computers.
+Covella features two primary classes for dates. `Datum` which resembles what we humans usually do, and `Timestamp` which is a very long number and the format prefered by computers. You can enter a date as a string in international format: Highest unit to lowest, seprated by `-` or `:`.
 
-To enter a Datum, you can use the following syntax.
+    val january1st1970 = "1970-01-01".inCalendar( moreAdvancedCalendar )
 
-    val myDatum = year>1970 & month>1 & day>1
-    
-You can create key-value pairs of time units and some index, separated by `>` and connect them with the `&` operator.
+You can define your calendar in implicit scope.
 
 We can convert between Datum and Timestamp by calling  
-- `Datum::begins(implicit cal: Calendar)`
-- `Datum::ends(implicit cal: Calendar)` and  
-- `Timestamp::datum(implicit cal: Calendar)`,  
+- `Datum::begins`, `Datum::ends` and `Timestamp::datum(implicit cal: Calendar)` for `Datum=>Option[Timestamp]` and
+- `Timestamp::inCalendar(implicit cal: Calendar)` for `Timestamp=>Datum`
 respectively.
 
 But in order to do so our Calendar requires information about what Datum corresponds to `Timestamp(0)`. Let's put that in.
 
-    julianCalendar setTimestampZero myDatum
+    julianCalendar setTimestampZero "1970-01-01"
     
-Using January 1st, 1970 happens to be the unix epoch. If you do not specify, our calendar would assume January 1, 1 CE.
+Using January 1st, 1970 happens to be the unix epoch. 
 
-### Secondary Cycles
-We still lack weeks in our model. Weeks form a cycle, independent of months and years. Let's create it.
+### Synchronisation
+We still lack weeks in our model. Weeks form a system, independent of months and years. We can set them up as their own Calendar.
 
-    val weeks = Cycle from days("Monday","Tuesday","Wednesday","Thursday","Friday",Saturday","Sunday") 
-                    named "week"
+    val weeks = 'week isCycleOf 'weekday madeFrom days comprising
+            ("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday")
+
+    val planetaryWeek = Calendar(weeks) setTimestampZero "0-Thursday"
                   
-Now let's add it to our Calendar. January 1st, 1970 happens to be a Thursday, the fourth day of the week.
+We set `timeStampZero`, to same point in time as our year-and-months calendar: 1970 started on a Thrusday. The 0 denotes the week, which will keep counting up for all eternity, but we probably don't care about that.
 
-    julianCalendar synchronize (weeks,4)
+    val myFirstCalendarSystem = moreAdvancedCalendar synchronize planetaryWeek
     
-If you want another synchronisation point, you can use `calendar at ... synchronize ...`.
+You can synchronise as many simple calendars as you like. Note that order matters: If units in several calendars have the same designation, all information concerning will be interpreted in terms of the first calendar where it occurs. Also entering dates as a String like we did above will only take into account the first calendar. For more advanced formatting you need:
 
 ### Date formats
 
 Our calendar is now complete and we are able to create dates. But we also want to output dates as strings or parse strings into dates. This can be done with the DateFormat class.
 
-    val internationalFormat = df"${num(year)}-{num(month)(2)}-{num(day)(2)}"
+    val internationalFormat = df"${num(year,4)}-{num(month)(2)}-{num(day)(2)}"
     
-This provides DateFormat complete with formatter and parsers. The standard package features convenience methods, so you can write: `df"$y-$m-$d"`
-
-We can now add our format to the calendar.
-
-    julianCalendar addFormat "international"->internationalFormat
-    
-We can now call `.format("international")` to format the date, assuming the calendar is in implicit scope.
-
-To parse a date, use `.toDatum` and `.toTimestamp`. These are extension methods on strings found in covella.Preamble.
-
-If you want to convert between calendars give them appropriate `timeStampZero` values and use `Timestamp::format(cal: Calendar)` with explicit calendar argument.
-   
-### More fun with dates
-Above, you already read how to create a Datum, e.g. `year>1983 & month>12 & day>2`. But how to say "day of week"? Or "week of year"? Easy.
-
-    val unconventionalDate = year>1983 & week/year>2 & day/week>1
- 
-The `/` can be read as "of". If you are not into squiggly signs or if you are on Java, you can also use "week of year is 2". The unit after the `/` is called the _context_. If you do not provide contexts explicitely, standard contexts will be infered depending on the way you set up your calendar. For example, since days appeared first as parts of months in our Julian Calendar, the standard context of day is month.
-
-Note that you do not have to provide a full list of time units in a Datum. But you should provide a chain beginning with your largest unit, if you want to convert into Timestamp. You can check the quality of your input by calling `Datum::check(implicit cal: Calendar)`. This will result in a subtype of `CalendricDate` that provides detailed information at type level.
+This string interpolation provides a DateFormat complete with formatter and parsers. The standard package features convenience methods, so you can write: `df"$y-$m-$d"`. You can then use `Calendar::parse` and `Datum::format` with the DateFormat in implicit scope.
