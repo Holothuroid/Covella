@@ -18,11 +18,10 @@ We first need a smallest time unit, called a `Tick`. Customarily, the JVM uses m
     val millis = Tick('millisecond) 
 
 ### Using Measures for regular time units
-We can know build upon that. 
+Build upon that, using the following syntax. 
 
-    val millis = Tick('millisecond)
     val seconds = 'second is (millis,1000)
-    val minutes = 'minute is (seconds,1000)
+    val minutes = 'minute is (seconds,60)
     val hours = 'hour is (minutes,60)
     val days = 'day is (hours,24)
 
@@ -46,7 +45,7 @@ Years and months can be created in one go.
 
 
 ### Calendars and Eras
-Now we can turn it into a calendar. 
+Now, we can turn it into a calendar. 
 
     val simpleCalendar = Calendar(standardYear)
     
@@ -54,7 +53,7 @@ That will work, but now all years are the same. To amend our first attempt, we f
  
      val moreAdvancedEra = Era given divisibleBy(4) have leapYear default standardYear
      
-An Era instance works like partial function. You can add a condition with `given` followed by `have` and the `Measurable` you want. You can add any number of such pairs. Once you are done, you may use `default` to set a default. Then put into a Calendar.
+An Era instance works like partial function. You can add a condition with `given` followed by `have` and the `Measurable` you want. You can add any number of such pairs. Once you are done, you may use `default` to set a default. Then put the era into a Calendar.
 
      val moreAdvancedCalendar = Calendar(moreAdvancedEra)
 
@@ -65,18 +64,18 @@ Covella features two primary classes for dates. `Datum` which resembles what we 
 
     val january1st1970 = "1970-01-01".inCalendar( moreAdvancedCalendar )
 
-You can define your calendar in implicit scope.
+You can define your calendar in implicit scope and forgeo the parameter.
 
 We can convert between Datum and Timestamp by calling  
 - `Datum::begins`, `Datum::ends` and `Timestamp::datum(implicit cal: Calendar)` for `Datum=>Option[Timestamp]` and
 - `Timestamp::inCalendar(implicit cal: Calendar)` for `Timestamp=>Datum`
 respectively.
 
-But in order to do so our Calendar requires information about what Datum corresponds to `Timestamp(0)`. Let's put that in.
+But in order to do so, our Calendar requires information about what Datum corresponds to `Timestamp(0)`. Let's put that in.
 
-    julianCalendar setTimestampZero "1970-01-01"
+    julianCalendar setTimestampZero "1970"
     
-Using January 1st, 1970 happens to be the unix epoch. 
+Using January 1st, 1970, which happens to be the unix epoch. 
 
 ### Synchronisation
 We still lack weeks in our model. Weeks form a system, independent of months and years. We can set them up as their own Calendar.
