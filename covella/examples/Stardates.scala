@@ -1,6 +1,6 @@
 package com.githup.holothuroid.covella.examples
 
-import com.githup.holothuroid.covella.Calendar
+import com.githup.holothuroid.covella._
 
 /**
   * Star Trek TNG stardates working on the following assumptions.
