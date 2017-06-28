@@ -16,8 +16,10 @@ import scala.language.implicitConversions
   */
 
 case class Datum(entries: Map[Symbol,DatumEntry] = Map(),cal: Option[Calendar] = None){
-  import entries.{apply, isDefinedAt, values}
+  import entries.{ isDefinedAt, values}
 
+  def apply(symbol: Symbol) : DatumEntry =
+    entries.applyOrElse[Symbol,DatumEntry](symbol,_ => Unknown(s"$symbol not found in Datum"))
   def this(tuples : (Symbol,DatumEntry)*)  = this(tuples.toMap)
 
 
@@ -45,9 +47,12 @@ case class Datum(entries: Map[Symbol,DatumEntry] = Map(),cal: Option[Calendar] =
   def isOkUntil : Option[Symbol] = cal.flatMap(_.units.takeWhile(this.isOkAt(_)).lastOption)
   def isComplete = isOkUntil.nonEmpty && isOkUntil == cal.map(_.units.last)
 
-  def begins : Option[Timestamp] = cal.flatMap(_.timestamp(this))
+
+
+
+  def begins : Option[Timestamp] = cal.flatMap(_.timestampOrZero(this))
   def ends : Option[Timestamp] = ???
-  def timestamp : Option[Timestamp] = if (begins == ends) begins else None
+  def timestamp : Option[Timestamp] = cal.flatMap(_.timestamp(this))
   def interval : Option[Interval] = for(start <- begins; end <-ends if start<=end) yield Interval(start,end)
 
 }
@@ -83,6 +88,7 @@ case class Timestamp(value: BigInt) extends AnyVal with Ordered[Timestamp] {
   def - (number: BigInt, measurable: Measurable) = Timestamp(this.value - number * measurable.ticks)
 
   def compare(that: Timestamp): Int = this.value compare that.value
+  def sinceZeroIn(measurable: Measurable) : BigInt = value/measurable.ticks
 
   def upTo(that: Timestamp) : Option[Interval] = if (this <= that) Some(Interval(this,that)) else None
 }

@@ -11,6 +11,7 @@ trait Calendar{
   def check(string: String)   :Datum
   def checkTokens(tokens: Seq[(Symbol,String)]) : Datum
   def timestamp(datum: Datum) : Option[Timestamp]
+  def timestampOrZero(datum: Datum) : Option[Timestamp]
   private[covella] def interpret(timestamp: Timestamp) : Datum
   def parse(string: String)(implicit df: DateFormat) : Datum
   def synchronise(cal: Calendar) : CalendarSystem
@@ -27,11 +28,11 @@ object Calendar{
   * This calendar has a hierarchy of time units, wrapped in an era. The lowest unit will be a Tick.
   * The calendar always
   * @param era
-  * @param timeStampZero
+  * @param timestampZero
   */
 
 case class SimpleCalendar(era: Era,
-                    timeStampZero: BigInt = BigInt(0)) extends Calendar {
+                          timestampZero: BigInt = BigInt(0)) extends Calendar {
 
   def primaryUnits : Seq[Symbol] = era.subunits
   def units = primaryUnits.toSet
@@ -41,16 +42,28 @@ case class SimpleCalendar(era: Era,
   }
 
 
+  //def byTicks(i: BigInt)  = era.byTicks(i+timestampZero)
+
+  private[covella] def interpret(timestamp: Timestamp) : Datum  =
+    era.byTicks(timestamp.value + timestampZero).toOption.get.copy(cal = Some(this))
+
+  def timestamp(datum: Datum): Option[Timestamp] = era.timestamp(datum).map(_ - timestampZero).map(Timestamp(_))
+
+  def timestampOrZero(datum: Datum): Option[Timestamp] = {
+    if (datum.isOkAt(era.unitDesignation)) Some(Timestamp(era.timestampOrZero(datum)- timestampZero))
+    else None
+  }
+
+  def setTimestampZero(string: String) = {
+    val timestampZero_ : BigInt = era.timestampOrZero(check(string))
+    this.copy(timestampZero = timestampZero_ )
+  }
+
+
   def check(string: String) : Datum = {
     if (string.trim.isEmpty) return Datum()
     val parts = string.split("[-:]").map(_.trim)
     era.check(parts).copy(cal = Some(this)) }
-
-
-  def byTicks(i: BigInt)  = era.byTicks(i-timeStampZero)
-  private[covella] def interpret(timestamp: Timestamp) : Datum  = byTicks(timestamp.value).toOption.get.copy(cal = Some(this))
-
-  def setTimeStampZero(string: String) = this.copy(timeStampZero = check(string).begins.get.value)
 
   def parse(string: String)(implicit df: DateFormat) : Datum = {
     val entries : Seq[(Symbol,String)] = df.parse(string)
@@ -67,9 +80,7 @@ case class SimpleCalendar(era: Era,
   }
 
 
-  def timestamp(datum: Datum): Option[Timestamp] = era.timestamp(datum).map(Timestamp(_))
-
-  override def toString = s"Calendar(${primaryUnits.mkString(",")};$timeStampZero)"
+  override def toString = s"Calendar(${primaryUnits.mkString(",")};$timestampZero)"
 
 }
 
@@ -103,6 +114,8 @@ case class CalendarSystem(cals: Seq[Calendar]) extends Calendar{
   def timestamp(datum: Datum): Option[Timestamp] = cals.head.timestamp(datum)
 
   override def toString: String = "CalendarSystem(" + cals.mkString(", ") +")"
+
+  def timestampOrZero(datum: Datum): Option[Timestamp] = cals.head.timestampOrZero(datum)
 }
 
 /**

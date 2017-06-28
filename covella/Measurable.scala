@@ -27,6 +27,7 @@ case class Tick(designation: Symbol) extends DateHandler with Measurable
   def check(seq: Seq[String]) = if(seq.isEmpty) new Datum() else new Datum('overflow ->Unknown(seq.mkString("-")))
   def byTicks(tocks: BigInt) = if (tocks==0) Right(Datum()) else Left("I'm a tick! You gave me:"+tocks)
   def timestamp(datum: Datum) : Option[BigInt] = if (datum.isOkAt(designation)) Some(0) else None
+  def timestampOrZero(datum: Datum) : BigInt = 0
 }
 
 
@@ -59,25 +60,44 @@ case class Measure(designation: Symbol,unit: Measurable, amount: BigInt /*Refine
         subsequentTicks <- unit.timestamp(datum))  //;
       yield unit.ticks *index + subsequentTicks
 
+
+  def timestampOrZero(datum: Datum) : BigInt =
+    unit.ticks * datum.get(unit.designation).getOrElse(0) + unit.timestampOrZero(datum)
+
+
 }
 
 
 /**
-  * This class can be used on subequent calendars in CalendarSystem to expose certain units that would be shadowed by
-  * @param designation
-  * @param unit
+  * This class wraps a Measurable and renames its designation.
+  * It can be used in subsequent calendars in a CalendarSystem to expose certain units that would be shadowed by previous entries.
+  * @param designation The new designation for the contained unit.
+  * @param unit The unit whose designation should be changed.
   */
 
 case class TimeUnitAlias(designation: Symbol, unit: Measurable) extends Measurable{
+  val unitDesignation = unit.designation
+
   def ticks: BigInt = unit.ticks
   def subunits: List[Symbol] = designation :: unit.subunits.tail
-  def check(seq: Seq[String]): Datum = unit.check(seq)
-  def byTicks(tocks: BigInt): Either[String, Datum] = unit.byTicks(tocks)
 
-  def timestamp(datum: Datum): Option[BigInt] = {
-    val newEntries = datum.entries.map { case (designation,value) => (unit.designation,value)
-                                         case foo => foo}
-
-    unit.timestamp(datum.copy(entries = newEntries))
+  private def dealias(datum: Datum) : Datum = {
+    val newEntries = datum.entries.map
+          { case (`designation`,value) => (unitDesignation,value)
+            case foo => foo}
+    datum.copy(entries = newEntries)
   }
+
+  private def alias(datum: Datum) : Datum = {
+    val newEntries = datum.entries.map
+        { case (`unitDesignation`,value) => (designation,value)
+          case foo => foo}
+    datum.copy(entries = newEntries)
+  }
+
+  def check(seq: Seq[String]): Datum = alias( unit.check(seq) )
+  def byTicks(tocks: BigInt): Either[String, Datum] =  unit.byTicks(tocks).map(alias(_))
+
+  def timestamp(datum: Datum): Option[BigInt] = unit.timestamp( dealias(datum) )
+  def timestampOrZero(datum: Datum) : BigInt = unit.timestampOrZero( dealias(datum) )
 }

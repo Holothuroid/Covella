@@ -23,7 +23,7 @@ object Symmetry454 {
       (5, "November"),
       (4, "December"))
 
-  val leapYear =  'year isCycleOf 'month madeFrom days comprising
+  val leapYear =  'year isCycleOf 'month madeFrom weeks comprising
     ((4, "January"),
       (5, "February"),
       (4, "March"),
@@ -38,6 +38,6 @@ object Symmetry454 {
       (5, "December"))  // <= leap weak!
 
   val sym454Era = Era given (x => ( 52*x+146)%293<52) have leapYear default standardYear
-  val sym454Calendar = Calendar(sym454Era) setTimestampZero "1970"
+  val sym454Calendar = Calendar(sym454Era) //setTimestampZero "1970"
 
 }

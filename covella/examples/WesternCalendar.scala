@@ -14,7 +14,7 @@ object CommonDays {
   val days = 'day is (hours,24)
 
   val julianDays = 'julianDay isAliasFor days  // Julian Days means counting days from noon on January 1, 4713 BC, proleptic Julian calendar
-  val jdCalendar = Calendar(julianDays) setTimestampZero "2440587-12" // Hope this is correct. Calendars are mess. ^^ Calculation courtesy of http://aa.usno.navy.mil/data/docs/JulianDate.php
+ val jdCalendar = Calendar(julianDays) setTimestampZero "2440587-12" // Hope this is correct. Calendars are mess. ^^ Calculation courtesy of http://aa.usno.navy.mil/data/docs/JulianDate.php
 
   val doubleHalfDays = 'day isCycleOf 'halfday madeFrom hours comprising ( (12,"AM"), (12, "PM") )
                 // If you want traditional counting of hours, this is a way to do it.
@@ -64,7 +64,7 @@ object WesternCalendar {
     (30, "November"),
     (31, "December"))
 
-  val julianEra = Era given
+   val julianEra = Era given
     (x => divisibleBy(4)(x) && (x != 0)) have leapYear given  // Julian leap rule
     (x => x!=0) have standardYear    // There is no year 0!
 
@@ -77,8 +77,8 @@ object WesternCalendar {
   val julianCalendar = Calendar(julianEra).setTimestampZero("1970") synchronise
     planetaryWeek.setTimestampZero("0-4")   // We don't really care about the number of the week, hence 0. The day was a Thursday, hence 4.
 
-  val gregorianCalendar = Calendar(gregorianEra).setTimestampZero("1970") synchronise
-    planetaryWeek.setTimestampZero("0-4")
+  val gregorianCalendar = Calendar(gregorianEra).setTimestampZero("1970")  synchronise
+    planetaryWeek.setTimestampZero("0-4")/**/
 
 
 }

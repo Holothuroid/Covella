@@ -48,6 +48,8 @@ trait DateHandler {
     */
 
   def timestamp(datum: Datum)   : Option[BigInt]
+  def timestampOrZero(datum: Datum)   : BigInt
+
 
   private lazy val pattern = """(\d+)""".r
 
