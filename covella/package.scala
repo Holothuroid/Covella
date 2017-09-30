@@ -28,7 +28,7 @@ package object covella {
                 val measurable = measurable_
 
                 def comprising(children: CycleChild*) =
-                  Cycle(desg,IrregularUnit(childDesg),measurable,children)
+                  OldenCycleCycle(desg,IrregularUnit(childDesg),measurable,children)
 
               }
       }
@@ -42,13 +42,12 @@ package object covella {
 
         val parsers = args.map(_.parse )
         val getters = args.map(_.format)
+        val placeholders = args.map(_.placeholder)
 
-      // Create a regex, substituting (.*) where the args where in the input.
-        val placeholders: collection.Seq[String] = for (i <- args.indices) yield "(.*)"
-        val regex = sc.parts.zipAll(placeholders, "", "").map { case (a, b) => a + b }.mkString("").r
+        val regex = sc.s(placeholders).r // Interpolate the placeholders using the s"..." function, then turn into a regex.
 
         val parse_ : PartialFunction[String, Seq[(Symbol,String)]] = {   // Create a function String=>Datum that pattern matches on the regex.
-          case regex(strings@_*)  => parsers zip strings map { case (function, arg) => function(arg) }   // Apply the capture groups
+          case regex(strings@_*)  => parsers zip strings map { case (function, arg) => function(arg) }
 
           case s                  => Seq(('dateFormat_Did_Not_Match,s))
         }
@@ -56,7 +55,8 @@ package object covella {
 
         // For the .format evaluate the datum for each getter, then use the StringContext we started the factory with.
         // Using .s on the StringContext will interpolate the strings we got.
-        val format_ = (datum: Datum) => { val applieds = getters.map(_ apply datum) ;  sc.s(applieds:_*) }
+        val format_ = (datum: Datum) => { val applieds = getters.map(_ apply datum) ;
+                                            sc.s(applieds:_*) }
 
 
         DateFormat(parse = parse_ , format = format_ )
@@ -69,7 +69,7 @@ package object covella {
     val format_ : Datum=>String           = (datum: Datum) =>
                                               datum.get(symbol).map(s"%0${padding}d".format(_)).getOrElse("#"*padding)
 
-    DateFormatHelper(format=format_ , parse =parse_ )
+    DateFormatHelper(format=format_ , parse =parse_, placeholder = "(\d*)" )
   }
 
   def nam(symbol: Symbol, default : String = "UNKNOWN") : DateFormatHelper ={
@@ -77,7 +77,7 @@ package object covella {
     val format_ : Datum=>String           = (datum: Datum) =>
       datum.getName(symbol).getOrElse(default)
 
-    DateFormatHelper(format=format_ , parse =parse_ )
+    DateFormatHelper(format=format_ , parse =parse_ , placeholder = "(.*)")
   }
 
   def y = num('year,4)
@@ -93,6 +93,5 @@ package object covella {
   def s = num('second)
   def S = nam('second,"#SECOND")
 
-  def divisibleBy(i: BigInt) : BigInt=>Boolean = x=> (x % i)==0
-  def notDivisibleBy(i: BigInt) : BigInt=>Boolean = x=> (x % i)==0
+
 }

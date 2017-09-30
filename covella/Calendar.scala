@@ -20,7 +20,7 @@ trait Calendar{
 
 
 object Calendar{
-  def apply(era: Era, tsz: BigInt = BigInt(0)) = SimpleCalendar(era,tsz)
+  def apply(era: Era, tsz: BigInt = BigInt(0)) = SimpleCalendar(era.optimise,tsz)
 }
 
 
@@ -133,6 +133,6 @@ case class DateFormat(parse: String=>Seq[(Symbol,String)], format: Datum=>String
   * @param format Similar to DateFormat.
   */
 
-case class DateFormatHelper(parse: String =>(Symbol,String),format: Datum=>String)
+case class DateFormatHelper(parse: String =>(Symbol,String),format: Datum=>String,placeholder : String)
 
 
