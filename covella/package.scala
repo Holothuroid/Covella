@@ -44,7 +44,7 @@ package object covella {
         val getters = args.map(_.format)
         val placeholders = args.map(_.placeholder)
 
-        val regex = sc.s(placeholders).r // Interpolate the placeholders using the s"..." function, then turn into a regex.
+        val regex = sc.s(placeholders : _*).r // Interpolate the placeholders using the s"..." function, then turn into a regex.
 
         val parse_ : PartialFunction[String, Seq[(Symbol,String)]] = {   // Create a function String=>Datum that pattern matches on the regex.
           case regex(strings@_*)  => parsers zip strings map { case (function, arg) => function(arg) }
