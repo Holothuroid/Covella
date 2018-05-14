@@ -1,14 +1,9 @@
-package com.githup.holothuroid.covella.examples
-import com.githup.holothuroid.covella._
+package com.github.holothuroid.covella.examples
+import com.github.holothuroid.covella._
 
-/**
-  * Created by 1of3 on 12.06.2017.
-  */
-object IndianNationalCalendar {
- import CommonDays._
+case class IndianNationalCalendar(days : TimeUnit = CommonDays.days) extends MonthsAndYears {
 
-  val standardYear = 'year isCycleOf 'month madeFrom days comprising
-    ((30,"Chaitra"),
+  val standardYear = year((30,"Chaitra"),
     (31, "Vaishākha"),
     (31, "Jyēshtha"),
     (31, "Āshādha"),
@@ -21,8 +16,7 @@ object IndianNationalCalendar {
     (30,"Māgha"),
     (30, "Phalguna"))
 
-  val leapYear = 'year isCycleOf 'month madeFrom days comprising
-    ((31,"Chaitra"),
+  val leapYear = year((31,"Chaitra"),
       (31, "Vaishākha"),
       (31, "Jyēshtha"),
       (31, "Āshādha"),
@@ -36,7 +30,8 @@ object IndianNationalCalendar {
       (30, "Phalguna"))
 
   val indianNationalEra = Era given ( y =>
-    (WesternCalendar.gregorianEra(y + 78) ==  WesternCalendar.leapYear) ) have leapYear
+    (WesternCalendar(days).prolepticGregorianEra(y + 78) ==  WesternCalendar(days).leapYear) ) have leapYear default standardYear
 
-  val indianNationalCalendar = Calendar(indianNationalEra) setTimestampZero "1891-10-11"
+  val indianNationalCalendar =
+    Calendar(indianNationalEra) setTimestampZero Datum.of('year -> 1891, 'month -> 10, 'day -> 11)
 }

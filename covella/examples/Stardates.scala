@@ -1,6 +1,6 @@
-package com.githup.holothuroid.covella.examples
+package com.github.holothuroid.covella.examples
 
-import com.githup.holothuroid.covella._
+import com.github.holothuroid.covella._
 
 /**
   * Star Trek TNG stardates working on the following assumptions.
@@ -20,11 +20,13 @@ import com.githup.holothuroid.covella._
 
 object Stardates {
   import CommonDays._
-  import WesternCalendar.gregorianCalendar
 
- val stardates = 'stardate is (hours,10)
- val stardateZero  = ( "2364".inCalendar(gregorianCalendar).begins.get - (41000,days) ).value
+
+ val stardates = 'stardate of (hours,10)
+ def stardateZero  = ( "2364".dateInCalendar(WesternCalendar().classicGregorianCalendar).begins.get - (41000,stardates) ).value
 
 
  val stardateCalendar =  Calendar(stardates,stardateZero)
 }
+
+
