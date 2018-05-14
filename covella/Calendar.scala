@@ -1,4 +1,4 @@
-package com.githup.holothuroid.covella
+package com.github.holothuroid.covella
 
 /**
   * Common interface for simple calendars and calendar systems.
@@ -8,14 +8,12 @@ package com.githup.holothuroid.covella
 trait Calendar{
   def primaryUnits : Seq[Symbol]
   def units : Set[Symbol]
-  def check(string: String)   :Datum
-  def checkTokens(tokens: Seq[(Symbol,String)]) : Datum
   def timestamp(datum: Datum) : Option[Timestamp]
   def timestampOrZero(datum: Datum) : Option[Timestamp]
   private[covella] def interpret(timestamp: Timestamp) : Datum
   def parse(string: String)(implicit df: DateFormat) : Datum
   def synchronise(cal: Calendar) : CalendarSystem
-
+  def check(datum: Datum) : Datum
 }
 
 
@@ -25,10 +23,10 @@ object Calendar{
 
 
 /**
-  * This calendar has a hierarchy of time units, wrapped in an era. The lowest unit will be a Tick.
-  * The calendar always
-  * @param era
-  * @param timestampZero
+  * The most basic Calendar.
+  * @param era A hierarchy of TimeUnits wrapped in an Era.
+  * @param timestampZero The offset to determine which Datum corresponds to Timestamp(0) in this Calendar.
+  *                      For convenience try `.setTimestampZero`
   */
 
 case class SimpleCalendar(era: Era,
@@ -37,12 +35,9 @@ case class SimpleCalendar(era: Era,
   def primaryUnits : Seq[Symbol] = era.subunits
   def units = primaryUnits.toSet
   def synchronise(that: Calendar) =  that match {
-    case SimpleCalendar(e,i) => CalendarSystem(Seq(this,that))
-    case CalendarSystem(seq) => CalendarSystem(Seq(this)++seq)
+    case SimpleCalendar(e,i) => CalendarSystem(Vector(this,that))
+    case CalendarSystem(seq) => CalendarSystem(Vector(this)++seq)
   }
-
-
-  //def byTicks(i: BigInt)  = era.byTicks(i+timestampZero)
 
   private[covella] def interpret(timestamp: Timestamp) : Datum  =
     era.byTicks(timestamp.value + timestampZero).toOption.get.copy(cal = Some(this))
@@ -54,31 +49,23 @@ case class SimpleCalendar(era: Era,
     else None
   }
 
-  def setTimestampZero(string: String) = {
-    val timestampZero_ : BigInt = era.timestampOrZero(check(string))
-    this.copy(timestampZero = timestampZero_ )
+  /**
+    * Create a new calendar with `.timestampZero` fitting the given date string.
+    * @param datum A Datum
+    * @return A new SimpleCalendar.
+    */
+
+  def setTimestampZero(datum: Datum) = {
+     check(datum).begins match {
+       case Some(timestamp) => Calendar(era,timestamp.value)
+       case None => throw new IllegalArgumentException("Datum has no fixed beginning. Unable to set Timestamp 0.")
+     }
   }
 
 
-  def check(string: String) : Datum = {
-    if (string.trim.isEmpty) return Datum()
-    val parts = string.split("[-:]").map(_.trim)
-    era.check(parts).copy(cal = Some(this)) }
+  def check(datum: Datum): Datum = era.check(datum.copy(cal = Some(this)))
 
-  def parse(string: String)(implicit df: DateFormat) : Datum = {
-    val entries : Seq[(Symbol,String)] = df.parse(string)
-    checkTokens(entries)
-  }
-
-  def checkTokens(tokens: Seq[(Symbol, String)]): Datum = {
-    val (founds,unknowns)   = tokens.partition(x => primaryUnits.contains(x._1))
-
-    val results : Seq[String] = for(unit <-primaryUnits ) yield founds.find(_._1 == unit).map(_._2).get
-    val errors = unknowns.map(x => x._1 -> Unknown(x._2)).toMap
-
-    era.check(results).copy(cal = Some(this)) &  Datum(errors)
-  }
-
+  def parse(string: String)(implicit df: DateFormat) : Datum = check(df.parse(string))
 
   override def toString = s"Calendar(${primaryUnits.mkString(",")};$timestampZero)"
 
@@ -90,49 +77,23 @@ case class CalendarSystem(cals: Seq[Calendar]) extends Calendar{
   lazy val primaryUnits  = cals.head.primaryUnits
   lazy val units : Set[Symbol] = cals.map(_.units).reduce(_ union _ )
 
-
-
   def synchronise(that: Calendar) =  that match {
-    case SimpleCalendar(e,i) => CalendarSystem(cals ++ Seq(that))
     case CalendarSystem(seq) => CalendarSystem(cals ++seq)
+    case _ => CalendarSystem(cals ++ Seq(that))
+
   }
 
-  def check(string: String) : Datum = cals.head.check(string)
-  def parse(string : String)(implicit df: DateFormat) : Datum = {
-    val tokens = df.parse(string)
-    checkTokens(tokens)
-  }
-
-  def checkTokens(tokens: Seq[(Symbol,String)]) : Datum = {
-    val dates = for (cal <- cals) yield cal checkTokens tokens.filter(t => cal.units.contains(t._1))
-    val unknowns = tokens.filterNot(x => units.contains(x._1)).map { case (unit,string) => unit->Unknown(string)}.toMap
-    Datum(unknowns,Some(this)) & dates.reduce(_&_)
-  }
+  def parse(string : String)(implicit df: DateFormat) : Datum =  cals.map(_.parse(string)(df)).reduce(_&_)  // todo: Test shadowing!
 
   def interpret(timestamp: Timestamp) : Datum = cals.map(_.interpret(timestamp)).reduce(_&_).copy(cal = Some(this))
 
-  def timestamp(datum: Datum): Option[Timestamp] = cals.head.timestamp(datum)
+  def timestamp(datum: Datum): Option[Timestamp] = cals.head.timestamp(datum) // todo: Timestamping should work if any one calendar can stamp and there are no contradictions.
+  def timestampOrZero(datum: Datum): Option[Timestamp] = cals.head.timestampOrZero(datum) // todo: see above.
 
   override def toString: String = "CalendarSystem(" + cals.mkString(", ") +")"
 
-  def timestampOrZero(datum: Datum): Option[Timestamp] = cals.head.timestampOrZero(datum)
+  override def check(datum: Datum): Datum = cals.map(_.check(datum)).reduce(_ & _) // todo: Might be better, if system checks congruence.
 }
 
-/**
-  * DateFormats include methods to turn Strings into Datums and back.
-  * @param parse Turns a String into a type that a Calendar's method `checkToken` can handle
-  * @param format Formats a Datum. This should work irrespective of the presence of a Calendar.
-  */
-
-case class DateFormat(parse: String=>Seq[(Symbol,String)], format: Datum=>String)
-
-/**
-  * DateFormatHelpers can be used in  `df""` string interpolation provided by DateFormatFactory.
-  * See also `num` and `nam` in the package object for examples.
-  * @param parse Similar to DateFormat, except for a single unit.
-  * @param format Similar to DateFormat.
-  */
-
-case class DateFormatHelper(parse: String =>(Symbol,String),format: Datum=>String,placeholder : String)
 
 

@@ -1,17 +1,4 @@
-package com.githup.holothuroid.covella
-
-/**
-  * Created by 1of3 on 04.06.2017.
-  */
-
-
-
-trait TimeUnit extends Any{
-  def designation : Symbol
-}
-
-case class IrregularUnit(designation: Symbol) extends  AnyVal with TimeUnit
-
+package com.github.holothuroid.covella
 
 
 /**
@@ -20,16 +7,15 @@ case class IrregularUnit(designation: Symbol) extends  AnyVal with TimeUnit
   */
 
 trait DateHandler {
-  def subunits: List[Symbol]
+  def subunits: Seq[Symbol]
 
   /**
-    * This method creates a datum from stringly input.
-    * Generally the current DateHandler will handle part of the input and call on its first subunit to carry on.
-    * @param seq The input is expected to be of type Seq[String] where each handler in the series treats one segment.
-    * @return A Datum.
+    * This method checks a datum, turning all `Unchecked...` DatumEntries to either Ok or a DatumError.
+    * @param datum The Datum to be checked.
+    * @return A new Datum with all entries checked.
     */
 
-  def check(seq : Seq[String]) : Datum
+  def check(datum: Datum) : Datum
 
   /**
     * This method possibly turns a number into a Datum.
@@ -40,29 +26,27 @@ trait DateHandler {
   def byTicks(tocks: BigInt) : Either[String,Datum]
 
   /**
-    * This method maybe turns a Datum into a number.
-    * Usually a DateHandler will measure how long it takes to reach the unit it handles, then requests information from its subunits.
-    * For this method to return some number, the datum should be complete and without error (cf. Datum).
+    * Measures how long it takes to reach a Datum.
+    * Handlers should delegate to the correct subhandler and add how long it takes to reach that subhandler
     * @param datum A Datum.
-    * @return Maybe Datum.
+    * @return Maybe a big number, representing an instant on the time line.
+    *         For this method to return some number, the datum should be complete and without error (cf. Datum).
     */
 
   def timestamp(datum: Datum)   : Option[BigInt]
+
+  /**
+    * Similar to `.timestamp`, but missing date entries will be assumed being 0.
+    * @param datum A Datum.
+    * @return A big number, representing the beginning of the given Datum on the time line.
+    */
+
   def timestampOrZero(datum: Datum)   : BigInt
 
 
   private lazy val pattern = """(\d+)""".r
 
-  protected def headThing(seq : Seq[String]) : Either[String,Int] = {
-    seq.head match { case pattern(x) => Right(x.toInt)
-    case x: String => Left(x) }
-  }
-  protected def headEntry(seq : Seq[String],upper: BigInt,lower: BigInt) : DatumEntry = {
-    headThing(seq) match { case Right(i) if i>upper => TooHigh(i,upper)
-    case Right(i) if i<lower => TooLow(i,lower)
-    case Right(i) => Ok(i)
-    case Left(x) => Unknown(x)}
-  }
+
 
 }
 

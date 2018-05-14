@@ -1,6 +1,7 @@
-package com.githup.holothuroid.covella
+package com.github.holothuroid.covella
 
 import scala.language.implicitConversions
+
 
 /**
   *  An Era is the top level element in a Calendar. It works similar to Measurables, except that it is infinite.
@@ -12,29 +13,62 @@ import scala.language.implicitConversions
   *
   */
 
-abstract class Era extends DateHandler with  Function1[BigInt,Option[Measurable]] {
+trait Era extends DateHandler with  PartialFunction[BigInt,Option[TimeUnit]] {
+
+  /**
+    * This method tries to convert the Era to a simpler form: Mixed -> Periodic -> Homogenous.
+    * Automatically called by Calendar.apply.
+    * @return An Era, either a simpler form or the starting object itself.
+    */
+
+  def optimise: Era
   def unitDesignation: Symbol
-  def apply(i: BigInt) : Option[Measurable]
-  def isDefinedAt(i: BigInt): Boolean
+
+  def excludingShiftPrevious(is: BigInt*) = ExcludingShiftPrevious(this,is.toSet)
+  def excludingShiftLater(is: BigInt*) = ExcludingShiftLater(this,is.toSet)
+}
+
+
+
+abstract class ConcreteEra extends Era  {
+
   def ticksOf(i : BigInt) : BigInt
   def ticksUntil (i: BigInt) : BigInt
 
+  def timestamp(datum: Datum): Option[BigInt] =
+    for(index <- datum.get(unitDesignation) if isDefinedAt(index);
+        maybeSubsequentTicks <- apply(index).map(_.timestamp(datum));
+        subsequentTicks <- maybeSubsequentTicks )
+      yield ticksUntil(index)  + subsequentTicks
 
-  def check(seq: Seq[String]) : Datum =
-    headThing(seq) map(i => (i,apply(i))) match
-    { case Right((i,Some(measurable)))  => new Datum(unitDesignation->Ok(i)) & measurable.check(seq.tail)
-    case _  => new Datum(unitDesignation->Unknown(seq.mkString("-"))) }
+  def timestampOrZero(datum: Datum): BigInt =
+    ticksUntil(datum.get(unitDesignation).getOrElse(0)) +
+      ( for(index <- datum.get(unitDesignation) if isDefinedAt(index);
+            subsequentTicks <- apply(index).map(_.timestampOrZero(datum)) )
+        yield  subsequentTicks ).getOrElse(0)
+
+
+  def check(datum: Datum) : Datum = {
+    val newDatum = datum.update(unitDesignation,_.requireAllowed(!isDefinedAt(_)) )
+
+    newDatum.get(unitDesignation) match {
+      case None => newDatum.remove(subunits.tail)
+      case Some(i) => apply(i).get.check(newDatum)
+    }
+  }
 
 
 }
 
 object Era {
-  def apply(measurable: Measurable) = HomogeneousEra(measurable)
-  implicit def measurable2era(measurable: Measurable) = HomogeneousEra(measurable)
+  def apply(measurable: TimeUnit) = HomogeneousEra(measurable)
+  implicit def measurable2era(measurable: TimeUnit) : HomogeneousEra = HomogeneousEra(measurable)
 
   def given(condition_ : BigInt=>Boolean) =
-    new { def have(value: Measurable) = MixedEra(Seq(EraClause(condition_ ,value))) }
+    new { def have(value: TimeUnit) = MixedEra(Seq(EraClause(condition_ ,value))) }
 
+  def given( is : BigInt *) =
+    new { def have(value: TimeUnit) = MixedEra(Seq(EraClause(is.contains(_) ,value))) }
 }
 
 
@@ -45,12 +79,13 @@ object Era {
   */
 
 
-case class HomogeneousEra(unit: Measurable) extends Era{
+case class HomogeneousEra(unit: TimeUnit) extends ConcreteEra {
   def subunits = unit.subunits
   def isDefinedAt(i: BigInt): Boolean = true
   def ticksOf(i: BigInt): BigInt = unit.ticks
   def unitDesignation: Symbol = unit.designation
-  def apply(i: BigInt): Option[Measurable] = Some(unit)
+  def apply(i: BigInt): Option[TimeUnit] = Some(unit)
+  def optimise = this
 
   def byTicks(tocks: BigInt): Either[String, Datum] = {
     val within : BigInt = tocks / unit.ticks
@@ -59,17 +94,15 @@ case class HomogeneousEra(unit: Measurable) extends Era{
     unit.byTicks(remainder) map { _ & new Datum(unitDesignation -> Ok(index)) }
   }
 
+  def ticksUntil(i: BigInt): BigInt = i * unit.ticks
 
-  def timestamp(datum: Datum): Option[BigInt] =
+  override def timestamp(datum: Datum): Option[BigInt] =
     (for(i <- unit.timestamp(datum)) yield datum.get(unitDesignation).map(_ * unit.ticks +i)).flatten
 
-  def timestampOrZero(datum: Datum): BigInt = datum.getOrElse(unitDesignation,0)  * unit.ticks + unit.timestampOrZero(datum)
+  override def timestampOrZero(datum: Datum): BigInt = datum.getOrElse(unitDesignation,0)  * unit.ticks + unit.timestampOrZero(datum)
 
-  def ticksUntil(i: BigInt): BigInt = i * unit.ticks
+  override def toString(): String = s"Era($unit)"
 }
-
-
-
 
 
 
@@ -81,34 +114,24 @@ case class HomogeneousEra(unit: Measurable) extends Era{
   *                On application, the era will deliver the Measurable from the first matching clause.
   */
 
-case class MixedEra(clauses: Seq[EraClause] /*Refined NonEmpty*/) extends Era   {
+case class MixedEra(clauses: Seq[EraClause] /*Refined NonEmpty*/) extends ConcreteEra   {
   val subunits = clauses.head.value.subunits
   val unitDesignation  = subunits.head
 
   require( clauses.forall(_.value.subunits == subunits) )
 
-  def apply(i: BigInt) : Option[Measurable]  = clauses.withFilter(_.condition(i)).map(_.value).headOption
+  def apply(i: BigInt) : Option[TimeUnit]  = clauses.withFilter(_.condition(i)).map(_.value).headOption
   def isDefinedAt(i: BigInt): Boolean = apply(i).nonEmpty
   def ticksOf(i : BigInt) : BigInt = apply(i).map(_.ticks).getOrElse(0)
 
+  def ticksUntil (i: BigInt) : BigInt =
+    if (i>=0) countUp(i,0,0)._2
+    else      countDown(i,0,0)._2
 
-
-
-
-  def ticksUntil (i: BigInt) : BigInt = if (i>=0) countUp(i,0,0)._2 else countDown(i,0,0)._2
-
-  def timestamp(datum: Datum) : Option[BigInt] =
-    for(index <- datum.get(unitDesignation) if isDefinedAt(index);
-        maybeSubsequentTicks <- apply(index).map(_.timestamp(datum));
-        subsequentTicks <- maybeSubsequentTicks )
-      yield ticksUntil(index)  + subsequentTicks
-
-  def timestampOrZero(datum: Datum): BigInt = {
-    ticksUntil(datum.get(unitDesignation).getOrElse(0)) +
-      ( for(index <- datum.get(unitDesignation) if isDefinedAt(index);
-      subsequentTicks <- apply(index).map(_.timestampOrZero(datum)) )
-    yield  subsequentTicks ).getOrElse(0)
-  }
+  def optimise =
+    if (clauses.map(_.value).toSet.size == 1) HomogeneousEra(clauses.head.value)
+    else if ( clauses.map(_.condition).forall(_.isInstanceOf[PeriodicFunction] ) ) PeriodicEra.fromClauses(clauses)
+    else this
 
   def byTicks(tocks: BigInt) : Either[String,Datum] = {
 
@@ -160,24 +183,12 @@ case class MixedEra(clauses: Seq[EraClause] /*Refined NonEmpty*/) extends Era   
 
 
   def given(condition_ : BigInt=>Boolean) =
-    new { def have(value: Measurable) = MixedEra(clauses :+  EraClause(condition_ ,value)) }
+    new { def have(value: TimeUnit) = MixedEra(clauses :+  EraClause(condition_ ,value)) }
 
-  def default(value: Measurable) = MixedEra(clauses :+ EraClause(x=>true,value))
+  def default(value: TimeUnit) = MixedEra(clauses :+ EraClause(Pass,value))
 }
 
 
-case class EraClause(condition: BigInt => Boolean, value: Measurable)
-
-
-
-
-
-
-
-
-
-
-
-
+case class EraClause(condition: BigInt => Boolean, value: TimeUnit)
 
 

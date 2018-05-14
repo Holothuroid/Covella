@@ -1,27 +1,21 @@
-package com.githup.holothuroid.covella
+package com.github.holothuroid.covella
+
 
 import scala.language.implicitConversions
 
 
-/**
-  * Created by 1of3 on 04.06.2017.
-  */
-
-
 
 /**
-  * A more or less human readable representation of dates, consisting of qualified key-value pairs.
+  * A human-ish representation of dates, consisting of qualified key-value pairs.
   * @param entries Maps Symbols to DatumEntries.
   * @param cal Optionally, a calendar according to which the DatumEntries are chosen.
   */
 
 case class Datum(entries: Map[Symbol,DatumEntry] = Map(),cal: Option[Calendar] = None){
-  import entries.{ isDefinedAt, values}
+  import entries.{isDefinedAt, values}
 
-  def apply(symbol: Symbol) : DatumEntry =
-    entries.applyOrElse[Symbol,DatumEntry](symbol,_ => Unknown(s"$symbol not found in Datum"))
+
   def this(tuples : (Symbol,DatumEntry)*)  = this(tuples.toMap)
-
 
   /**
     * The method combines two Datums. It takes all the units from this object, as well as its calendar, if present.
@@ -32,29 +26,102 @@ case class Datum(entries: Map[Symbol,DatumEntry] = Map(),cal: Option[Calendar] =
     */
   def & (that: Datum) : Datum =  Datum(that.entries ++ this.entries,this.cal)
 
-  def get(symbol: Symbol) : Option[BigInt] = apply(symbol) match { case Ok(x,_) => Some(x)
-                                                                   case _ => None }
+  // Getters
+  def apply(symbol: Symbol) : Option[DatumEntry] = entries.get(symbol)
+  def get(symbol: Symbol) : Option[BigInt] = entries.get(symbol).flatMap(_.value)
+  def getName(symbol: Symbol) : Option[String] = entries.get(symbol).flatMap(_.name)
   def getOrElse(symbol: Symbol, default: BigInt) : BigInt = get(symbol).getOrElse(default)
-
-  def getName(symbol: Symbol) : Option[String] = apply(symbol) match { case Ok(_,x) => x
-                                                                       case _ => None }
   def getNameOrElse(symbol: Symbol, default: String) : String = getName(symbol).getOrElse(default)
 
-  def format(implicit df: DateFormat) : String = df.format(this)
 
-  def withoutError : Boolean = values.forall(_.isInstanceOf[Ok])
-  def isOkAt(unit: Symbol) = isDefinedAt(unit) && apply(unit).isInstanceOf[Ok]
+  // Methods creating new Datums.
+  def remove(tus: Iterable[Symbol] ) : Datum = this.copy(entries = this.entries -- tus)
+  def update(tu: Symbol, entry: DatumEntry) : Datum = this.copy(entries = this.entries.updated(tu,entry))
+
+  def update(tu: Symbol, modification: DatumEntry=>DatumEntry) : Datum =
+    apply(tu).map(modification) match {
+       case Some(newEntry) => this.copy(entries = this.entries.updated(tu,newEntry))
+       case None => this
+     }
+
+  def withCalendar(cal: Calendar): Datum = {
+    val uncheckedEntries = entries.map{ case (tu,entry) => (tu,entry.reset) }
+
+    cal.check(Datum(uncheckedEntries))
+  }
+
+
+  // Predicates
+  def withError : Boolean = values.exists(_.isInstanceOf[DatumError])
+  def isOk : Boolean = values.forall(_.isInstanceOf[Ok])
+  def isOkAt(unit: Symbol) = isDefinedAt(unit) && entries(unit).isInstanceOf[Ok]
   def isOkUntil : Option[Symbol] = cal.flatMap(_.units.takeWhile(this.isOkAt(_)).lastOption)
   def isComplete = isOkUntil.nonEmpty && isOkUntil == cal.map(_.units.last)
 
 
+  /**
+    * Checks wheter two Datums match, by the following critera:
+    * - A Datum containing one or more DatumErrors matches nothing.
+    * - Otherwise all useful information contained in both Datums must be equal.
+    * - Information found in only one of the Datums is ignored.
+    * - Whether or not the Datums point to a Calendar, doesn't matter for the result.
+    * - The method is symmetric.
+    * - Hence, the empty Datum matches all Datums without errors.
+    * @param that Another Datum.
+    * @return Boolean.
+    */
 
+  def matches(that: Datum) : Boolean ={
+    if (this.withError || that.withError) return false
+
+    (this.entries.keySet intersect that.entries.keySet).forall { key =>
+      val thisValue = this.entries(key).value
+      val thatValue = this.entries(key).value
+      val thisName = this.entries(key).name
+      val thatName = this.entries(key).name
+
+      (thisValue.isEmpty || thisValue==thatValue) && (thisName.isEmpty || thisName==thatName)
+    }
+  }
+
+
+  // Methods creating other kinds of objects.
+  def format(implicit df: DateFormat) : String = df.format(this)
 
   def begins : Option[Timestamp] = cal.flatMap(_.timestampOrZero(this))
-  def ends : Option[Timestamp] = ???
+  def ends : Option[Timestamp] = ??? // todo: Might require additional method in DateHandler Symbol => BigInt, with symbol signifying the final element
+
   def timestamp : Option[Timestamp] = cal.flatMap(_.timestamp(this))
   def interval : Option[Interval] = for(start <- begins; end <-ends if start<=end) yield Interval(start,end)
 
+
+  override def toString: String = {
+    val start = "Datum(" + entries.mkString(", ")
+    cal match {
+      case Some(calendar) => start + s"; $calendar)"
+      case None => start + ")"
+    }
+  }
+
+}
+
+
+object Datum{
+  def of(pairs: (Symbol,BigInt)*) = {
+    val entries = pairs.map { case (symbol,i) => (symbol,UncheckedIndex(i)) }
+    Datum(entries.toMap)
+  }
+
+  def ofNames(pairs: (Symbol,String)*) = {
+    val entries = pairs.map { case (symbol,s) => (symbol,UncheckedName(s)) }
+    Datum(entries.toMap)
+  }
+
+  def ofPairs(pairs: (Symbol,(BigInt,String))*) = {
+    val entries = pairs.map { case (symbol,(i,s)) => (symbol,UncheckedPair(i,s)) }
+    Datum(entries.toMap)
+  }
+
 }
 
 
@@ -62,63 +129,92 @@ case class Datum(entries: Map[Symbol,DatumEntry] = Map(),cal: Option[Calendar] =
 
 
 
-sealed trait DatumEntry
-case class Ok(index: BigInt, name: Option[String] = None) extends DatumEntry
-case class TooHigh(index: BigInt, upperBound: BigInt) extends DatumEntry
-case class TooLow(index: BigInt, upperBound: BigInt) extends DatumEntry
-case class NameNotFound(name: String) extends DatumEntry
-case class NonUniqueName(name: String, indices: Set[BigInt]) extends DatumEntry
-case class Unknown(stuff: String) extends DatumEntry
+
+sealed trait DatumEntry{
+  def value: Option[BigInt] = None
+  def name: Option[String] = None
+  def reset: Unchecked
+
+  private def inBounds(tentativeIndex: BigInt,lower: BigInt,upper: BigInt, forbidden: BigInt=>Boolean) : DatumEntry = {
+    require(lower < upper)
+    if (tentativeIndex < lower) TooLow(tentativeIndex,lower)
+    else if (tentativeIndex > upper) TooHigh(tentativeIndex,upper)
+    else if (forbidden(tentativeIndex)) Forbidden(tentativeIndex)
+    else Ok(tentativeIndex)
+  }
+
+  def requireValue(lower: BigInt, upper: BigInt, forbidden: BigInt=>Boolean = _=>false): DatumEntry = {
+    this match {
+      case e: DatumError => e
+      case p: PotentiallyCorrect =>  (p.value,p.name) match{
+        case (Some(i),_) => inBounds(i,lower,upper,forbidden)
+        case (None,Some(s)) => Unknown(s)
+        case (None,None) => throw new IllegalStateException("DatumEntry has neither value nor name; and is not an error.")
+      }
+    }
+  }
+
+  def requireAllowed(forbidden: BigInt=>Boolean): DatumEntry =
+    this match {
+      case e: DatumError => e
+      case p: PotentiallyCorrect =>  (p.value,p.name) match{
+        case (Some(i),_) => if (forbidden(i)) Forbidden(i) else Ok(i)
+        case (None,Some(s)) => Unknown(s)
+        case (None,None) => throw new IllegalStateException("DatumEntry has neither value nor name; and is not an error.")
+      }
+    }
 
 
-
-/**
-  * A "computer date", consisting of a very long number.
-  * @param value Said number.
-  */
-
-
-case class Timestamp(value: BigInt) extends AnyVal with Ordered[Timestamp] {
-
-  def inCalendar(implicit cal: Calendar)  = cal.interpret(this)
-
-  def + (measurable: Measurable) = Timestamp(this.value + measurable.ticks)
-  def - (measurable: Measurable) = Timestamp(this.value - measurable.ticks)
-  def + (number: BigInt, measurable: Measurable) = Timestamp(this.value + number * measurable.ticks)
-  def - (number: BigInt, measurable: Measurable) = Timestamp(this.value - number * measurable.ticks)
-
-  def compare(that: Timestamp): Int = this.value compare that.value
-  def sinceZeroIn(measurable: Measurable) : BigInt = value/measurable.ticks
-
-  def upTo(that: Timestamp) : Option[Interval] = if (this <= that) Some(Interval(this,that)) else None
 }
 
-object Timestamp{
-  implicit def timestamp2Datum(t: Timestamp)(implicit cal: Calendar) : Datum = t.inCalendar(cal)
+sealed trait PotentiallyCorrect extends DatumEntry
+
+
+case class Ok(index: BigInt,override val name: Option[String] = None) extends PotentiallyCorrect{
+  override def value  = Some(index)
+
+  override def reset: Unchecked = name match {
+    case Some(s) => UncheckedPair(index,s)
+    case None => UncheckedIndex(index)
+  }
+}
+
+trait Unchecked extends PotentiallyCorrect{
+  override def reset = this
+}
+
+case class UncheckedIndex(tentativeIndex: BigInt) extends Unchecked{
+  override def value = Some(tentativeIndex)
+}
+
+case class UncheckedName(tentativeName: String) extends Unchecked{
+  override def name = Some(tentativeName) }
+
+case class UncheckedPair(tentativeIndex: BigInt,tentativeName: String) extends Unchecked{
+  override def value = Some(tentativeIndex)
+  override def name = Some(tentativeName) }
+
+
+trait DatumError extends DatumEntry
+
+trait NumericError extends DatumError{
+  def tentativeIndex : BigInt
+  override def reset = UncheckedIndex(tentativeIndex)
+}
+
+case class TooHigh(tentativeIndex: BigInt, upperBound: BigInt) extends NumericError
+case class TooLow(tentativeIndex: BigInt, upperBound: BigInt) extends NumericError
+case class Forbidden(tentativeIndex: BigInt) extends NumericError
+case class NameNotFound(tentativeName: String) extends DatumError{
+  override def reset = UncheckedName(tentativeName)
+}
+case class Incongruent(tentativeIndex: BigInt,tentativeName: String) extends DatumError{
+  override def reset: Unchecked = UncheckedPair(tentativeIndex,tentativeName)
+}
+
+case class Unknown(stuff: String) extends DatumError {
+  override def reset = UncheckedName(stuff)
 }
 
 
-/**
-  * This class describes an interval of time.
-  * @param starts Timestamp when it starts.
-  * @param ends Timestamp when it ends.
-  */
 
-case class Interval(starts: Timestamp, ends: Timestamp)  {
-  require (starts.value <= ends.value)
-
-  def contains(t: Timestamp) = starts <= t && t <= ends
-  def contains(i: Interval) = starts <= i.starts && i.ends <= ends
-  def overlaps(that: Interval) = (this contains that.starts) || (this contains that.ends)
-  def < (t: Timestamp) = ends < t
-  def > (t: Timestamp) = t  < starts
-  def < (that: Interval) = this.ends < that.starts
-  def > (that: Interval) = this.starts > that.ends
-
-
-  def intersect(that: Interval) : Option[Interval] =
-    if (!(this overlaps that)) None
-    else if (that.starts<=this.ends) Some(Interval(that.starts,this.ends))
-         else   Some(Interval(this.starts,that.ends))
-
-}
