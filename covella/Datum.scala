@@ -80,7 +80,8 @@ case class Datum(entries: Map[Symbol,DatumEntry] = Map(),cal: Option[Calendar] =
       val thisName = this.entries(key).name
       val thatName = this.entries(key).name
 
-      (thisValue.isEmpty || thisValue==thatValue) && (thisName.isEmpty || thisName==thatName)
+      (thisValue.isEmpty || thatValue.isEmpty || thisValue==thatValue) &&
+        (thisName.isEmpty || thatName.isEmpty || thisName==thatName)
     }
   }
 
