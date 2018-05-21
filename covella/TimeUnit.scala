@@ -38,6 +38,13 @@ trait TimeUnit extends  DateHandler {
     case x if ! (subunits contains x) => 0
     case y => amountInImpl(y)
   }
+
+  /**
+    * Creates a vector repeating this TimeUnit. Useful for creating Cycles.
+    * @param i How often?
+    * @return A Vector of TimeUnit.
+    */
+  def * (i: Int) : Vector[TimeUnit] = (1 to i).map(_ => this).toVector
 }
 
 
