@@ -35,11 +35,11 @@ You can then use the `year` method to create your year like so:
 
 
 ### Calendars and Eras
-Now, we can turn it into a calendar. 
+Now, let's turn it into a calendar. 
 
     val simpleCalendar = Calendar(standardYear)
     
-That will work, but now all years are the same. To amend our first attempt, we first need a `leapYear`. We can construct it like the standard year but with a different Feburary. Then we need a way to define our leap rule or "intercalation", if you feel fancy.
+That will work, but now all years are the same. To amend that first attempt, we first need a `leapYear`. We can construct it like the standard year but with a different Feburary. Then we need a way to define our leap rule or "intercalation", if you feel fancy.
  
      val moreAdvancedEra = Era given divisibleBy(4) have leapYear default standardYear
      
@@ -59,7 +59,7 @@ Covella features two primary classes for dates. `Datum` which resembles what we 
 You can define your calendar in implicit scope and forgeo the parameter.
 
 We can convert between Datum and Timestamp by calling  
-- `Datum::begins`, `Datum::ends` and `Timestamp::datum(implicit cal: Calendar)` for `Datum=>Option[Timestamp]` and
+- `Datum::begins`, `Datum::ends` for `Datum=>Option[Timestamp]` and
 - `Timestamp::inCalendar(implicit cal: Calendar)` for `Timestamp=>Datum`
 respectively.
 
