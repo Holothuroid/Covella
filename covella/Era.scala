@@ -24,6 +24,9 @@ trait Era extends DateHandler with  PartialFunction[BigInt,Option[TimeUnit]] {
   def optimise: Era
   def unitDesignation: Symbol
 
+  def ticksOf(i : BigInt) : BigInt
+  def ticksUntil (i: BigInt) : BigInt
+
   def excludingShiftPrevious(is: BigInt*) = ExcludingShiftPrevious(this,is.toSet)
   def excludingShiftLater(is: BigInt*) = ExcludingShiftLater(this,is.toSet)
 }
@@ -32,8 +35,7 @@ trait Era extends DateHandler with  PartialFunction[BigInt,Option[TimeUnit]] {
 
 abstract class ConcreteEra extends Era  {
 
-  def ticksOf(i : BigInt) : BigInt
-  def ticksUntil (i: BigInt) : BigInt
+
 
   def timestamp(datum: Datum): Option[BigInt] =
     for(index <- datum.get(unitDesignation) if isDefinedAt(index);

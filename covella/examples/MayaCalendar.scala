@@ -80,7 +80,8 @@ case class MayaCalendar(days: TimeUnit = CommonDays.days) {
     Calendar(tzolkinNumberDays) setTimestampZero
       Datum.of('tzolkinNumberCycle-> 0, 'tzolkinNumberDay->13) synchronise
       Calendar(tzolkinNameDays).setTimestampZero(
-        Datum.of('tzolkinNameCycle->0, 'tzolkinNameDay ->5 )) // = Chickchan
+        Datum.of('tzolkinNameCycle->0, 'tzolkinNameDay ->5 )) add // = Chickchan
+      ('tzolkin -> (x => (x.get('tzolkinNumberDay).get.toInt,x.getName('tzolkinNameDay).get)))
 
 
   // Aliases are required to prevent variable shadowing
@@ -106,7 +107,14 @@ case class MayaCalendar(days: TimeUnit = CommonDays.days) {
     * The Haab and Tzolkin Calendar round of approximately 52 years.
     */
 
-  lazy val calendarRound = haabCalendar synchronise tzolkinCalendar // todo: Add year bearer
+  lazy val calendarRound = calendarRoundPre add ('yearBearer -> calculateYearBearer  )
+
+  private lazy val calendarRoundPre = haabCalendar synchronise tzolkinCalendar
+
+  private def calculateYearBearer(datum: Datum) : (Int,String)  = datum.get('haabYear)
+    .map(x => Datum.of('haabYear -> x)).map(_.withCalendar(calendarRoundPre)).flatMap(_.begins).
+    map(_.inCalendar(calendarRoundPre)).map(x => (x.get('tzolkin),x.getName('tzolkin))).
+    map { case (a,b) => (a.getOrElse(BigInt(0)).toInt,b.getOrElse(""))}.getOrElse(null)
 
   /**
     * DateFormat combining Tzolkin and Haab formats.

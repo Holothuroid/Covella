@@ -217,5 +217,5 @@ case class Unknown(stuff: String) extends DatumError {
   override def reset = UncheckedName(stuff)
 }
 
-
-
+case class Extra( override val value: Option[BigInt],
+                override val name: Option[String] ) extends Unchecked

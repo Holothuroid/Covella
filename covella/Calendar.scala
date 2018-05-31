@@ -14,11 +14,40 @@ trait Calendar{
   def parse(string: String)(implicit df: DateFormat) : Datum
   def synchronise(cal: Calendar) : CalendarSystem
   def check(datum: Datum) : Datum
+
+  def additionalAccessors : Map[Symbol,Datum=>DatumEntry]
+  protected def addEntry(keyAndFunction: (Symbol, Datum => DatumEntry)): Calendar
+
+  def addIndex(keyAndFunction : (Symbol, Datum => Int)) : Calendar =
+    addEntry(keyAndFunction._1, x => Extra(Option(keyAndFunction._2(x)),None))
+
+  def addName(keyAndFunction : (Symbol, Datum => String)) : Calendar =
+    addEntry(keyAndFunction._1, x => Extra(None,Option(keyAndFunction._2(x))))
+
+  def add(keyAndFunction : (Symbol, Datum => (Int,String))) : Calendar =
+    addEntry(keyAndFunction._1, x =>
+      Extra(Option(keyAndFunction._2(x)._1),Option(keyAndFunction._2(x)._2)))
+
+  def addAdditionals(datum: Datum): Datum = {
+    val entries = for ((key, function) <- additionalAccessors) yield (key,function(datum))
+    new Datum(entries,Some(this)) & datum
+  }
+
+  /**
+    * Create a datum from pairing the given numbers with this Calendar's primary units.
+    * @param ints Indices for this calendars primary units.
+    * @return A Datum in this calendar.
+    */
+
+  def datum (ints: BigInt*) =
+    Datum.of(primaryUnits.zip(ints) :_*) withCalendar this
 }
 
 
 object Calendar{
-  def apply(era: Era, tsz: BigInt = BigInt(0)) = SimpleCalendar(era.optimise,tsz)
+  def apply(era: Era,
+            tsz: BigInt = BigInt(0),
+            acc: Map[Symbol,Datum=>DatumEntry] = Map()) = SimpleCalendar(era.optimise,tsz,acc)
 }
 
 
@@ -30,17 +59,19 @@ object Calendar{
   */
 
 case class SimpleCalendar(era: Era,
-                          timestampZero: BigInt = BigInt(0)) extends Calendar {
+                          timestampZero: BigInt = BigInt(0),
+                          additionalAccessors : Map[Symbol,Datum=>DatumEntry] = Map())
+  extends Calendar {
 
   def primaryUnits : Seq[Symbol] = era.subunits
   def units = primaryUnits.toSet
   def synchronise(that: Calendar) =  that match {
-    case SimpleCalendar(e,i) => CalendarSystem(Vector(this,that))
-    case CalendarSystem(seq) => CalendarSystem(Vector(this)++seq)
+    case SimpleCalendar(e,i,a) => CalendarSystem(Vector(this,that))
+    case CalendarSystem(seq,acc) => CalendarSystem(Vector(this)++seq,acc)
   }
 
   private[covella] def interpret(timestamp: Timestamp) : Datum  =
-    era.byTicks(timestamp.value + timestampZero).toOption.get.copy(cal = Some(this))
+    addAdditionals(era.byTicks(timestamp.value + timestampZero).toOption.get.copy(cal = Some(this)))
 
   def timestamp(datum: Datum): Option[Timestamp] = era.timestamp(datum).map(_ - timestampZero).map(Timestamp(_))
 
@@ -50,12 +81,12 @@ case class SimpleCalendar(era: Era,
   }
 
   /**
-    * Create a new calendar with `.timestampZero` fitting the given date string.
+    * Create a new calendar with `.timestampZero` fitting the given Datum.
     * @param datum A Datum
     * @return A new SimpleCalendar.
     */
 
-  def setTimestampZero(datum: Datum) = {
+  def setTimestampZero(datum: Datum ): SimpleCalendar = {
      check(datum).begins match {
        case Some(timestamp) => Calendar(era,timestamp.value)
        case None => throw new IllegalArgumentException("Datum has no fixed beginning. Unable to set Timestamp 0.")
@@ -63,36 +94,58 @@ case class SimpleCalendar(era: Era,
   }
 
 
-  def check(datum: Datum): Datum = era.check(datum.copy(cal = Some(this)))
+  /**
+    * Pair the given numbers with this Calendar's primary units,
+    * then call `.setTimestampZero` with the resulting Datum.
+    * @param ints A list of numbers corresponding to incdices of this calendars primary units.
+  * @return A new SimpleCalendar.
+    */
+
+  def setTimestampZero(ints: BigInt*) : SimpleCalendar =  setTimestampZero ( datum(ints :_*) )
+
+
+
+
+
+  def check(datum: Datum): Datum = addAdditionals(era.check(datum.copy(cal = Some(this))))
 
   def parse(string: String)(implicit df: DateFormat) : Datum = check(df.parse(string))
 
   override def toString = s"Calendar(${primaryUnits.mkString(",")};$timestampZero)"
 
+  override def addEntry(keyAndFunction: (Symbol, Datum => DatumEntry)) : SimpleCalendar =
+    this.copy(additionalAccessors = additionalAccessors.updated(keyAndFunction._1,keyAndFunction._2))
+
 }
 
 
-case class CalendarSystem(cals: Seq[Calendar]) extends Calendar{
+case class CalendarSystem(cals: Seq[Calendar],
+                          additionalAccessors : Map[Symbol,Datum=>DatumEntry] = Map()) extends Calendar{
 
   lazy val primaryUnits  = cals.head.primaryUnits
   lazy val units : Set[Symbol] = cals.map(_.units).reduce(_ union _ )
 
   def synchronise(that: Calendar) =  that match {
-    case CalendarSystem(seq) => CalendarSystem(cals ++seq)
-    case _ => CalendarSystem(cals ++ Seq(that))
+    case CalendarSystem(seq,acc) => CalendarSystem(cals ++seq,additionalAccessors ++ acc)
+    case _ => CalendarSystem(cals ++ Seq(that),additionalAccessors)
 
   }
 
   def parse(string : String)(implicit df: DateFormat) : Datum =  cals.map(_.parse(string)(df)).reduce(_&_)  // todo: Test shadowing!
 
-  def interpret(timestamp: Timestamp) : Datum = cals.map(_.interpret(timestamp)).reduce(_&_).copy(cal = Some(this))
+  def interpret(timestamp: Timestamp) : Datum =
+    addAdditionals(cals.map(_.interpret(timestamp)).reduce(_&_).copy(cal = Some(this)))
 
   def timestamp(datum: Datum): Option[Timestamp] = cals.head.timestamp(datum) // todo: Timestamping should work if any one calendar can stamp and there are no contradictions.
   def timestampOrZero(datum: Datum): Option[Timestamp] = cals.head.timestampOrZero(datum) // todo: see above.
 
   override def toString: String = "CalendarSystem(" + cals.mkString(", ") +")"
 
-  override def check(datum: Datum): Datum = cals.map(_.check(datum)).reduce(_ & _) // todo: Might be better, if system checks congruence.
+  override def check(datum: Datum): Datum =
+    addAdditionals(cals.map(_.check(datum)).reduce(_ & _)) // todo: Might be better, if system checks congruence.
+
+  override def addEntry(keyAndFunction: (Symbol, Datum => DatumEntry)) : CalendarSystem =
+    this.copy(additionalAccessors = additionalAccessors.updated(keyAndFunction._1,keyAndFunction._2))
 }
 
 

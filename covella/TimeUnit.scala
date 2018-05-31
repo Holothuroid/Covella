@@ -48,6 +48,12 @@ trait TimeUnit extends  DateHandler {
 }
 
 
+object TimeUnit{
+
+  import scala.language.implicitConversions
+  implicit def tu2symbol(tu: TimeUnit) : Symbol = tu.designation
+}
+
 /**
   * The basic unit in a Calendar with exactly one tick.
   * @param designation The name for this unit as a Symbol.

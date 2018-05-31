@@ -23,9 +23,11 @@ case class Symmetry454(days : TimeUnit = CommonDays.days) {
     weeks4,weeks5,weeks4,
     weeks4,weeks5,weeks4,
     weeks4,weeks5,weeks4,
+    weeks4,weeks5,weeks4,
   ) withNames(monthNames : _*) withOffset 1
 
   val leapYear =  'year isCycleOf (
+    weeks4,weeks5,weeks4,
     weeks4,weeks5,weeks4,
     weeks4,weeks5,weeks4,
     weeks4,weeks5,weeks5,  // Leap week in December

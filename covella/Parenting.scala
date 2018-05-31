@@ -78,7 +78,7 @@ case class Cycle(designation: Symbol, children: Seq[TimeUnit]) extends PureParen
 
   lazy val ticks = childTicks.sum
 
-  override private[covella] def amountInImpl(tu: Symbol) = children map (_.amountIn(tu)) sum
+  override private[covella] def amountInImpl(tu: Symbol) = children.map(_.amountIn(tu)).sum
 
   def subunits = designation +: children.head.subunits
 

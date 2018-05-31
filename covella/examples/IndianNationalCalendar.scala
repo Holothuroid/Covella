@@ -29,8 +29,20 @@ case class IndianNationalCalendar(days : TimeUnit = CommonDays.days) extends Mon
       (30,"Māgha"),
       (30, "Phalguna"))
 
-  val indianNationalEra = Era given ( y =>
-    (WesternCalendar(days).prolepticGregorianEra(y + 78) ==  WesternCalendar(days).leapYear) ) have leapYear default standardYear
+  object leapRule extends PeriodicFunction {
+    override def baseNumber: Int = 400
+
+    override def apply(v1: BigInt): Boolean = {
+      val y = v1 + 78
+      if(y % 400 == 0) true
+      else if (y % 100 == 0 ) false
+      else if (y % 4 == 0) true
+      else false
+    }
+  }
+
+
+  val indianNationalEra = Era given leapRule have leapYear default standardYear
 
   val indianNationalCalendar =
     Calendar(indianNationalEra) setTimestampZero Datum.of('year -> 1891, 'month -> 10, 'day -> 11)
