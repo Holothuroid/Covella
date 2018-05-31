@@ -1,3 +1,5 @@
+package com.github.holothuroid.covella.tests
+
 import com.github.holothuroid.covella._
 import com.github.holothuroid.covella.examples.WesternCalendar
 import org.scalatest._
@@ -98,4 +100,21 @@ class ExcludingEraTest extends FlatSpec with Matchers with PropertyChecks with C
     Datum.of('year -> 1970)
 
   "An era with ExcludingShiftPrevious" should behave like partialInverse(cal)
+}
+
+
+class GradedEraTest extends FlatSpec with Matchers with PropertyChecks with CalendarTests{
+
+  val foo = WesternCalendar()
+
+  import foo._
+
+  val era = GradedEra startingWith
+    classicJulianEra beginning
+    1582 have year1582 beginning
+    1583 have prolepticGregorianEra
+
+  val cal = Calendar( era )
+
+  "A calendar with GradedEra" should behave like partialInverse(cal)
 }

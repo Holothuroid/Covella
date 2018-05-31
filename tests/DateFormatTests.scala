@@ -1,3 +1,5 @@
+package com.github.holothuroid.covella.tests
+
 import org.scalatest.{Matchers, _}
 
 class DateFormatTests extends FlatSpec with Matchers {
