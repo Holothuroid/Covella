@@ -92,7 +92,7 @@ class Satellites (val phases: Seq[(String,String)]) {
       getVisibility(p,notable)
     }
 
-    ( Calendar(cycle) addName (visDesig -> determineVisibility) ) .asInstanceOf[SimpleCalendar]
+     Calendar(cycle) addName (visDesig -> determineVisibility)
   }
 
 }

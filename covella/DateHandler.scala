@@ -1,6 +1,5 @@
 package com.github.holothuroid.covella
 
-
 /**
   * This trait includes utility methods for converting date information between different formats.
   * Known implementors: Measurable, Era
@@ -46,10 +45,3 @@ trait DateHandler {
 
 
 }
-
-
-
-
-
-
-

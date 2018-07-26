@@ -44,18 +44,28 @@ case class Datum(entries: Map[Symbol,DatumEntry] = Map(),cal: Option[Calendar] =
        case None => this
      }
 
-  def withCalendar(cal: Calendar): Datum = {
+  /**
+    * Sets this Datum to the target calendar, then checks the Datum.
+    * If Datum is without error, it should be completed by all information provided by the given calendar.
+    * @param cal The target calendar.
+    * @return The so constructed Datum.
+    */
+
+  def completeWithCalendar(implicit cal: Calendar): Datum = {
     val uncheckedEntries = entries.map{ case (tu,entry) => (tu,entry.reset) }
 
-    cal.check(Datum(uncheckedEntries))
+    val checked = cal.check(Datum(uncheckedEntries))
+
+    if (checked.hasError) checked
+    else checked.begins.map(_.inCalendar(cal)).getOrElse(Datum(Map(),Some(cal)))
   }
 
 
   // Predicates
-  def withError : Boolean = values.exists(_.isInstanceOf[DatumError])
+  def hasError : Boolean = values.exists(_.isInstanceOf[DatumError])
   def isOk : Boolean = values.forall(_.isInstanceOf[Ok])
   def isOkAt(unit: Symbol) = isDefinedAt(unit) && entries(unit).isInstanceOf[Ok]
-  def isOkUntil : Option[Symbol] = cal.flatMap(_.units.takeWhile(this.isOkAt(_)).lastOption)
+  def isOkUntil : Option[Symbol] = cal.flatMap(_.primaryUnits.takeWhile(this.isOkAt(_)).lastOption)
   def isComplete = isOkUntil.nonEmpty && isOkUntil == cal.map(_.units.last)
 
 
@@ -72,7 +82,7 @@ case class Datum(entries: Map[Symbol,DatumEntry] = Map(),cal: Option[Calendar] =
     */
 
   def matches(that: Datum) : Boolean ={
-    if (this.withError || that.withError) return false
+    if (this.hasError || that.hasError) return false
 
     (this.entries.keySet intersect that.entries.keySet).forall { key =>
       val thisValue = this.entries(key).value
@@ -89,10 +99,17 @@ case class Datum(entries: Map[Symbol,DatumEntry] = Map(),cal: Option[Calendar] =
   // Methods creating other kinds of objects.
   def format(implicit df: DateFormat) : String = df.format(this)
 
-  def begins : Option[Timestamp] = cal.flatMap(_.timestampOrZero(this))
-  def ends : Option[Timestamp] = ??? // todo: Might require additional method in DateHandler Symbol => BigInt, with symbol signifying the final element
+  lazy val begins : Option[Timestamp] = cal.flatMap(_.timestampOrZero(this))
 
-  def timestamp : Option[Timestamp] = cal.flatMap(_.timestamp(this))
+  def ends : Option[Timestamp] = {
+    if (cal.isEmpty || begins.isEmpty) return None
+    if (timestamp.nonEmpty) return timestamp
+
+
+
+  }
+
+  lazy val timestamp : Option[Timestamp] = cal.flatMap(_.timestamp(this))
   def interval : Option[Interval] = for(start <- begins; end <-ends if start<=end) yield Interval(start,end)
 
 

@@ -1,4 +1,6 @@
 package com.github.holothuroid
+
+
 package object covella {
 
   /**
@@ -34,19 +36,19 @@ package object covella {
       Cycle(enrichedSymbol, namedChildren.map(_._1)) withNames (namedChildren.map(_._2) :_*)
 
     def cycles (childUnit: TimeUnit) =
-          new { def as(childSymbol: Symbol) =
-                  new {
-                        def comprising(ints: Int* ): Cycle = {
-                          val children = ints map (i => Measure(childSymbol,childUnit,i))
-                          Cycle(enrichedSymbol,children)
-                        }
-
-
-                        def comprising(tuples: (Int,String)*) : WithNames =
-                          comprising(tuples.map(_._1) : _*).withNames(tuples.map(_._2) : _*)
-
-                  }
+      new { def as(childSymbol: Symbol) =
+        new {
+          def comprising(ints: Int* ): Cycle = {
+            val children = ints map (i => Measure(childSymbol,childUnit,i))
+            Cycle(enrichedSymbol,children)
           }
+
+
+          def comprising(tuples: (Int,String)*) : WithNames =
+            comprising(tuples.map(_._1) : _*).withNames(tuples.map(_._2) : _*)
+
+        }
+      }
   }
 
 
@@ -72,7 +74,7 @@ package object covella {
       // For the .format evaluate the datum for each getter, then use the StringContext we started the factory with.
       // Using .s on the StringContext will interpolate the strings we got.
       val format_ = (datum: Datum) => { val applieds = getters.map(_ apply datum) ;
-                                            sc.s(applieds:_*) }
+        sc.s(applieds:_*) }
 
       // For a new placeholder, remove capture groups, then add new parentheses
       val placeholder_ = "(" + interpolated.filter(c => c!='(' && c!=')') + ")"

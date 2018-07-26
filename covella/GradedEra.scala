@@ -25,41 +25,44 @@ case class GradedEra private[covella] (eras: Vector[Era], upperBounds : Vector[B
     }
 
 
-  private def findEraNumberByIndex(i: BigInt) : Int = upperBounds.zipWithIndex.find(_._1 >=i).map(_._2).getOrElse(eras.size-1)
-  private def findEraByIndex(i: BigInt) : Era = eras(findEraNumberByIndex(i))
+   def findEraNumberByIndex(i: BigInt) : Int = upperBounds.zipWithIndex.find(_._1 >=i).map(_._2).getOrElse(eras.size-1)
+   def findEraByIndex(i: BigInt) : Era = eras(findEraNumberByIndex(i))
 
-  private def findLowerBoundByTocks(tocks: BigInt) : Option[BigInt]  =  upperBounds.takeWhile(_ <= tocks).lastOption
-  private def findUpperBoundByTocks(tocks: BigInt) : Option[BigInt]  =  upperBounds.find(_>=tocks)
+   def findLowerBoundByTocks(tocks: BigInt) : Option[BigInt]  =  upperBounds.takeWhile(_ <= tocks).lastOption
+   def findUpperBoundByTocks(tocks: BigInt) : Option[BigInt]  =  upperBounds.find(_>=tocks)
 
-  private def ticksOfEra(eraIndex: Int) : Option[BigInt] =
+   def ticksOfEra(eraIndex: Int) : Option[BigInt] =
     if (eraIndex == 0 || eraIndex >= eras.size) None
     else {
       val era = eras(eraIndex)
       Some ( (era.ticksUntil(upperBounds(eraIndex)) - era.ticksUntil(upperBounds(eraIndex-1))).abs)
     }
 
-  private def centralEraNumber : Int = findEraNumberByIndex(0)
-  private def centralEra : Era = findEraByIndex(0)
-  private def centralEraUpper : Option[BigInt] = findUpperBoundByTocks(0)
-  private def centralEraLower : Option[BigInt] = findLowerBoundByTocks(0)
+   def centralEraNumber : Int = findEraNumberByIndex(0)
+   def centralEra : Era = findEraByIndex(0)
+   def centralEraUpper : Option[BigInt] = findUpperBoundByTocks(0)
+   def centralEraLower : Option[BigInt] = findLowerBoundByTocks(0)
 
-  private def laterEras : Vector[(BigInt,Int)] /* Lower Boundary and EraIndex */ =
+   def laterEras : Vector[(BigInt,Int)] /* Lower Boundary and EraIndex */ =
     (centralEraNumber+1 until eras.size).map(x => (upperBounds(x-1),x)).toVector
 
-  private def earlierEras : Vector[(BigInt,Int)] =
+   def earlierEras : Vector[(BigInt,Int)] =
     (0 until centralEraNumber).map(x => (upperBounds(x),x)).toVector
 
-  private def ticksUntilCentralEraUppper : Option[BigInt] = centralEraUpper.map(centralEra.ticksUntil)
-  private def ticksUntilCentralEraLower : Option[BigInt] = centralEraLower.map(centralEra.ticksUntil)
+   def ticksUntilCentralEraUppper : Option[BigInt] = centralEraUpper.map(centralEra.ticksUntil)
+   def ticksUntilCentralEraLower : Option[BigInt] = centralEraLower.map(centralEra.ticksUntil)
 
-  private def findEraNumberByTocks(tocks: BigInt) : Int =
+   def findEraNumberByTocks(tocks: BigInt) : Int =
     if ((ticksUntilCentralEraUppper.isEmpty || tocks < ticksUntilCentralEraUppper.get) && (
       ticksUntilCentralEraLower.isEmpty || tocks >= ticksUntilCentralEraLower.get ))
       centralEraNumber
-    else if (tocks >0) ???
+    else if (tocks >0) {
+      ticksUntilCentralEraUppper
+      ???
+    }
     else ???
 
-  private def findEraByTocks(tocks: BigInt): Era = eras(findEraNumberByTocks(tocks))
+   def findEraByTocks(tocks: BigInt): Era = eras(findEraNumberByTocks(tocks))
 
 
 

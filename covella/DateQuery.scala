@@ -1,4 +1,4 @@
-package com.githup.holothuroid.covella
+package com.github.holothuroid.covella
 
 /**
   * Created by 1of3 on 04.06.2017.

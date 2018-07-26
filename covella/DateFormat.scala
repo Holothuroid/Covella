@@ -1,6 +1,5 @@
 package com.github.holothuroid.covella
 
-
 /**
   * DateFormats include methods to turn Strings into Datums and back.
   *

@@ -21,7 +21,7 @@ trait Decorator [T <: DateHandler]{
   def timestampOrZero(datum: Datum) : BigInt = decoratee.timestampOrZero( undecorate(datum) )
 
   // Methods going both ways...
-  def check(datum: Datum): Datum = decorate( undecorate(decoratee.check(datum) ) )
+  def check(datum: Datum): Datum = decorate( decoratee.check(undecorate( datum) ) )
 }
 
 
@@ -30,6 +30,8 @@ trait TimeUnitDecorator[T <: TimeUnit] extends Decorator[T] with TimeUnit{
   def ticks : BigInt = decoratee.ticks
   def designation : Symbol = decoratee.designation
   override private[covella] def amountInImpl(tu: Symbol) = decoratee.amountIn(tu)
+
+  override def delegate(datum: Datum): Option[TimeUnit] = Some(decoratee)
 }
 
 /**

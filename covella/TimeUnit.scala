@@ -45,6 +45,16 @@ trait TimeUnit extends  DateHandler {
     * @return A Vector of TimeUnit.
     */
   def * (i: Int) : Vector[TimeUnit] = (1 to i).map(_ => this).toVector
+
+
+  def calcDuration(datum: Datum) : Option[BigInt] =
+    datum.isOkUntil match {
+      case designation => Some(ticks)
+      case x if !subunits.contains(x) => None
+      case _ => delegate(datum).flatMap(_.calcDuration(datum))
+    }
+
+  def delegate(datum: Datum) : Option[TimeUnit]
 }
 
 
@@ -68,6 +78,7 @@ case class Tick(designation: Symbol) extends TimeUnit{
   def byTicks(tocks: BigInt) = if (tocks==0) Right(Datum()) else Left("I'm a tick! You gave me:"+tocks)
   def timestamp(datum: Datum) : Option[BigInt] = if (datum.isOkAt(designation)) Some(0) else None
   def timestampOrZero(datum: Datum) : BigInt = 0
+  def delegate(datum: Datum) = throw new IllegalAccessException("Attemped delegation in Tick.")
 
   override private[covella] def amountInImpl(tu: Symbol) = throw new IllegalAccessException("Attempted `amountInImpl` in class Tick. That should never happen.")
 }

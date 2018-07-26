@@ -60,6 +60,7 @@ case class Measure(designation: Symbol, unit: TimeUnit, amount: Int ) extends Pu
 
   override private[covella] def amountInImpl(tu: Symbol) : Int = amount * unit.amountIn(tu)
 
+  def delegate(datum: Datum) = Some(unit)
 
 }
 
@@ -118,4 +119,6 @@ case class Cycle(designation: Symbol, children: Seq[TimeUnit]) extends PureParen
     val index: BigInt = datum.get(childDesignation).getOrElse(0)
     ticksUntil(index.toInt) + children(index.toInt).timestampOrZero(datum)
   }
+
+  def delegate(datum: Datum): Option[TimeUnit] = for(index <- datum get childDesignation) yield children(index.toInt)
 }
