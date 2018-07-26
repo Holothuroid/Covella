@@ -6,7 +6,7 @@ import com.github.holothuroid.covella._
   * The calendar of the Maya people, as best as I understand it.
   * Includes Tzolkin, Haab, Long Count and Lords of Night.
   * Timestamps are set in regard to 1970-01-01 CE for synchronisation with other calendars.
-  * @param days The precision of timekeeping. By stanard, counting seconds.
+  * @param days The precision of timekeeping. By standard, counting seconds.
   */
 
 case class MayaCalendar(days: TimeUnit = CommonDays.days) {
@@ -31,20 +31,6 @@ case class MayaCalendar(days: TimeUnit = CommonDays.days) {
   lazy val katuns = 'katun of (tuns,20)
   lazy val baktuns = 'baktun of (katuns,20)
 
-
-  // DateFormats for Long Count
-  lazy val k = num('kin)
-  lazy val w = num('winal)
-  lazy val t = num('tun)
-  lazy val kat = num('katun)
-  lazy val b = num('baktun)
-
-  /**
-    * Long Count date format giving numbers for baktun, katun, tun, winal and kin.
-    */
-  lazy val longCountFormat : DateFormat = df"$b.$kat.$t.$k"
-
-
    /** Haab
     18 months of 20 days and 5 empty days */
 
@@ -62,12 +48,6 @@ case class MayaCalendar(days: TimeUnit = CommonDays.days) {
       "Sak'","Keh","Mak","K'ank'in","Muwan'",
       "Pax","K'ayab", "Kumk'u","Wayeb'") withOffset 1 // months are counted from 1
 
-  /**
-    *  DateFormat for Haab, giving number of day in month and month name.
-    */
-
-  lazy val haabFormat = df"${num('haabMonthDay)} ${nam('haabMonth)}"
-
 
   /** Tzolkin
   * Year consisting of two cycles:
@@ -77,11 +57,10 @@ case class MayaCalendar(days: TimeUnit = CommonDays.days) {
   * Modeled here by synchronizing two SimpleCalendars. */
 
   lazy val tzolkinCalendar =
-    Calendar(tzolkinNumberDays) setTimestampZero
+    Calendar(tzolkinNumbers) setTimestampZero
       Datum.of('tzolkinNumberCycle-> 0, 'tzolkinNumberDay->13) synchronise
-      Calendar(tzolkinNameDays).setTimestampZero(
-        Datum.of('tzolkinNameCycle->0, 'tzolkinNameDay ->5 )) add // = Chickchan
-      ('tzolkin -> (x => (x.get('tzolkinNumberDay).get.toInt,x.getName('tzolkinNameDay).get)))
+      Calendar(tzolkinNames).setTimestampZero(
+        Datum.of('tzolkinNameCycle->0, 'tzolkinNameDay ->5 ))  // = Chickchan
 
 
   // Aliases are required to prevent variable shadowing
@@ -98,28 +77,23 @@ case class MayaCalendar(days: TimeUnit = CommonDays.days) {
       "K'ib'", "Kab'an", "Etz'nab'", "Kwak", "Ajaw"
     ) withOffset 1
 
-
-  /** DateFormat for Tzolkin, giving number and name.
-    */
-  lazy val tzolkinFormat = df"${num('tzolkinNumberDay)} ${nam('tzolkinNameDay)}"
-
   /**
     * The Haab and Tzolkin Calendar round of approximately 52 years.
     */
 
   lazy val calendarRound = calendarRoundPre add ('yearBearer -> calculateYearBearer  )
 
-  private lazy val calendarRoundPre = haabCalendar synchronise tzolkinCalendar
+  private[covella] lazy val calendarRoundPre = haabCalendar synchronise tzolkinCalendar
 
-  private def calculateYearBearer(datum: Datum) : (Int,String)  = datum.get('haabYear)
-    .map(x => Datum.of('haabYear -> x)).map(_.withCalendar(calendarRoundPre)).flatMap(_.begins).
-    map(_.inCalendar(calendarRoundPre)).map(x => (x.get('tzolkin),x.getName('tzolkin))).
-    map { case (a,b) => (a.getOrElse(BigInt(0)).toInt,b.getOrElse(""))}.getOrElse(null)
-
-  /**
-    * DateFormat combining Tzolkin and Haab formats.
-    */
-  lazy val calendarRoundFormat : DateFormat = df"$tzolkinFormat $haabFormat"
+  private def calculateYearBearer(datum: Datum) : (Int,String)  =
+    datum.get('haabYear)
+    .map(x => Datum.of('haabYear -> x))
+      .map(_.completeWithCalendar(calendarRoundPre))
+      .flatMap(_.begins)
+      .map(_.inCalendar(calendarRoundPre))
+      .map(x => (x.get('tzolkinNumberDay).getOrElse(BigInt(-1)).toInt,
+        x.getName('tzolkinNameDay).getOrElse("UNKNOWN_TZOLKIN")))
+      .getOrElse((0,"UNKNOWN_YEARBEARER"))
 
 
   /**
@@ -133,17 +107,72 @@ case class MayaCalendar(days: TimeUnit = CommonDays.days) {
   private lazy val nights = 'lordOfNight isAliasFor days
   lazy val lordsOfNight = 'lordOfNightCycle of (nights,9) withOffset 1
 
+  /**
+    * The Long Count combined with the Haab and Tzolkin Calendar Round as well as the Lords of Night.
+    */
+
+  lazy val mayaCalendar = longCountCalendar synchronise calendarRound synchronise lordsOfNightCalendar
+
+}
+
+
+object MayaCalendar{
+
+  /**
+    * Includes DateFormats for the single places of the Long Count.
+    */
+
+  object LongCountParts {
+    lazy val k = num('kin)
+    lazy val w = num('winal)
+    lazy val t = num('tun)
+    lazy val kat = num('katun)
+    lazy val b = num('baktun)
+  }
+
+  import LongCountParts._
+
+
+  /**
+    * Long Count date format giving numbers for baktun, katun, tun, winal and kin.
+    */
+  lazy val longCountFormat : DateFormat = df"$b.$kat.$t.$w.$k"
+
+
+  /**
+    *  DateFormat for Haab, giving number of day in month and month name.
+    */
+
+  lazy val haabFormat = df"${num('haabMonthDay)} ${nam('haabMonth)}"
+
+
+  /** DateFormat for Tzolkin, giving number and name.
+    */
+  lazy val tzolkinFormat = df"${num('tzolkinNumberDay)} ${nam('tzolkinNameDay)}"
+
+
+  /**
+    * DateFormat combining Tzolkin and Haab formats.
+    */
+  lazy val calendarRoundFormat : DateFormat = df"$tzolkinFormat $haabFormat"
 
   /**
     * DateFormat giving the Lord of Night for a date as G1 - G9.
     */
   lazy val lordsOfNightFormat = df"G${num('lordOfNight,1)}"
 
-
   /**
-    * The Long Count combined with the Haab and Tzolkin Calendar Round as well as the Lords of Night.
+    * DateFormat extracting the Year Bearer from with number and name from a Datum.
     */
 
-  lazy val mayaCalendar = longCountCalendar synchronise calendarRound synchronise lordsOfNightCalendar
+  lazy val yearBearerFormat = df"${num('yearBearer)} ${nam('yearBearer)}"
+
+
+  /**
+    * DateFormat with Long Count, Tzolkin, Haab, Year Bearer and Lord of Night
+    */
+
+  lazy val mayaFormat = df"$longCountFormat $tzolkinFormat $haabFormat, $lordsOfNightFormat, YB: $yearBearerFormat"
+
 
 }

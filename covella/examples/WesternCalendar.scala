@@ -16,7 +16,10 @@ case class PlanetaryWeek(days : TimeUnit = CommonDays.days){
 
 
 
-case class WesternCalendar(days : TimeUnit = CommonDays.days) extends MonthsAndYears {
+case class WesternCalendar(days : TimeUnit = CommonDays.days,
+                           monthNames: Seq[String] = Vector("January", "February", "March", "April", "May",
+                             "June","July","August","September","October","November","December"),
+                           override val prefix: String = "") extends MonthsAndYears {
 
   lazy val days31 = month(31)
   lazy val standardFebruary = month(28)
@@ -24,14 +27,13 @@ case class WesternCalendar(days : TimeUnit = CommonDays.days) extends MonthsAndY
   lazy val leapFebruary = month(29)
 
   /**
-    * Constructs a year with the common month names.
+    * Constructs a year with the given month names.
     * @param monthLengths The months as unnamed TimeUnits.
-    * @return A time unit designated ad 'year with the common month names, counting from 1.
+    * @return A time unit designated as 'year or 'prefixYear with the given month names, counting from 1.
     */
 
-  def westernYear(monthLengths: Seq[TimeUnit]) = 'year isCycleOf (monthLengths: _*) withNames
-    ("January", "February", "March", "April", "May",
-    "June","July","August","September","October","November","December") withOffset 1
+  def westernYear(monthLengths: Seq[TimeUnit]) = localYearSymbol isCycleOf (monthLengths: _*) withNames
+    (monthNames :_*) withOffset 1
 
   /**
     * A vector of the months as TimeUnits with lengths determined in the Julian Reform.
@@ -46,12 +48,12 @@ case class WesternCalendar(days : TimeUnit = CommonDays.days) extends MonthsAndY
   /**
     * The Julian common year.
     */
-  lazy val standardYear = westernYear(julianMonthLengths)
+  lazy val standardYear : WithOffset = westernYear(julianMonthLengths)
 
   /**
     * The Julian leap year, with an additional day in Februray.
     */
-  lazy val leapYear = westernYear(julianMonthLengths updated (2,leapFebruary))
+  lazy val leapYear : WithOffset = westernYear(julianMonthLengths updated (2,leapFebruary))
 
 
   lazy val prolepticJulianEra = Era given divisibleBy(4) have leapYear  default standardYear
@@ -138,4 +140,5 @@ case class WesternCalendar(days : TimeUnit = CommonDays.days) extends MonthsAndY
   lazy val englishSwitchCalendar = switchCalendar(1752,year1752)
   lazy val september1752 = month(19) excludingAll (3 to 13)
   lazy val year1752 =   westernYear(julianMonthLengths updated (9,september1752))
+
 }

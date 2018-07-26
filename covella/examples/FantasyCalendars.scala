@@ -125,9 +125,9 @@ case class EberronCalendar(days : TimeUnit = CommonDays.days){
     case (name,orbit,remainsNotable,startingPosition) =>
       {
       val phase = if (startingPosition < orbit/2) 1 else 2
-      val day = startingPosition % (orbit/2)
+      val phaseTicks = (startingPosition % (orbit/2)) * days.ticks
 
-      planesFactory.make(name.toLowerCase,orbit,days,remainsNotable) setTimestampZero (0,phase,day)
+      planesFactory.make(name.toLowerCase,orbit,days,remainsNotable) setTimestampZero (0,phase,phaseTicks)
       }
     }
 

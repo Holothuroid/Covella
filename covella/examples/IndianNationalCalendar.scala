@@ -1,7 +1,8 @@
 package com.github.holothuroid.covella.examples
 import com.github.holothuroid.covella._
 
-case class IndianNationalCalendar(days : TimeUnit = CommonDays.days) extends MonthsAndYears {
+case class IndianNationalCalendar(days : TimeUnit = CommonDays.days,
+                                  override val prefix: String = "") extends MonthsAndYears {
 
   val standardYear = year((30,"Chaitra"),
     (31, "Vaishākha"),
