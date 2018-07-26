@@ -52,11 +52,9 @@ Once you are done, you may use `default` to set a default. Then put the era into
 Note that this is not really the calendar we use. The leap rule is more complicated, there is no year 0, and things are really weird in 1582. If you want to savor the thing, find `WesternCalendar` in the examples package.
 
 ### Datum and Timestamp
-Covella features two primary classes for dates. `Datum` which resembles what we humans usually do, and `Timestamp` which is a very long number and the format prefered by computers. You can enter a date as a string in international format: Highest unit to lowest, seprated by `-` or `:`.
+Covella features two primary classes for dates. `Datum` which resembles what we humans usually do, and `Timestamp` which is a very long number and the format prefered by computers. Easiest way to create a Datum is `Calendar::datum` with indexes from largest to smallest, breaking of at any point.
 
-    val january1st1970 = "1970-01-01".dateInCalendar( moreAdvancedCalendar )
-
-You can define your calendar in implicit scope and forgeo the parameter.
+    val january1st1970 = moreAdvancedCalendar.datum(1970,1,1)
 
 We can convert between Datum and Timestamp by calling  
 - `Datum::begins`, `Datum::ends` for `Datum=>Option[Timestamp]` and
@@ -65,9 +63,7 @@ respectively.
 
 But in order to do so, our Calendar requires information about what Datum corresponds to `Timestamp(0)`. Let's put that in.
 
-    julianCalendar setTimestampZero Datum.of('year -> 1970)
-    
-Using January 1st, 1970, which happens to be the unix epoch. 
+    val calendarWithUnixEpoch = moreAdvancedCalendar setTimestampZero january1st1970 
 
 ### Synchronisation
 We still lack weeks in our model. Weeks form a system, independent of months and years. We can set them up as their own Calendar.
@@ -75,13 +71,13 @@ We still lack weeks in our model. Weeks form a system, independent of months and
     val weeks = val weeks = 'week of ('weekday isAliasFor days) withNames
       ("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday") withOffset 1
 
-    val planetaryWeek = Calendar(weeks) setTimestampZero Date.of('week ->0, 'weekday->4)
+    val planetaryWeek = Calendar(weeks) setTimestampZero Datum.of('week ->0, 'weekday->4)
                   
 We set `timeStampZero`, to same point in time as our year-and-months calendar: 1970 started on a Thursday (fourth day of the week). The 0 denotes the week, which will keep counting up for all eternity, but we probably don't care about that.
 
-    val myFirstCalendarSystem = moreAdvancedCalendar synchronize planetaryWeek
+    val myFirstCalendarSystem = calendarWithUnixEpoch synchronise planetaryWeek
     
-You can synchronise as many simple calendars as you like. Note that order matters: If units in several calendars have the same designation, all information concerning will be interpreted in terms of the first calendar where it occurs. Also entering dates as a String like we did above will only take into account the first calendar. For more advanced formatting you need:
+You can synchronise as many calendars as you like. Note that order matters: If units in several calendars have the same designation, all information concerning will be interpreted in terms of the first calendar where it occurs. Also the `.datum` method only works with respect to the first calendar in the system. 
 
 ### Date formats
 
@@ -89,4 +85,4 @@ Our calendar is now complete and we are able to create dates. But we also want t
 
     val germanFormat = df"$d.$m.$y"
     
-This string interpolation provides a DateFormat of 'dd.mm.yyyy' complete with formatter and parsers. You can then use `Calendar::parse` and `Datum::format` with the DateFormat in implicit scope.
+This string interpolation provides a DateFormat of 'dd.mm.yyyy' complete with formatter and parser. You can then use `Calendar::parse` and `Datum::format` with the DateFormat in implicit scope.
